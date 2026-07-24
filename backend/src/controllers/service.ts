@@ -53,43 +53,44 @@ export const createServiceOperation = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required service details' });
     }
 
-    // Run in transaction to safely generate receipt
-    const result = await prisma.$transaction(async (tx) => {
-      const operation = await tx.serviceOperation.create({
-        data: {
-          entrepriseId,
-          userId,
-          clientId,
-          type,
-          subType,
-          provider,
-          amount: parseFloat(amount),
-          fees: fees ? parseFloat(fees) : 0,
-          phone,
-          reference,
-          passengerName,
-          flightNumber,
-          departure,
-          destination,
-          flightDate,
-          airline,
-          ticketPrice: ticketPrice ? parseFloat(ticketPrice) : null,
-          commissionType,
-          commission: commission ? parseFloat(commission) : null,
-          notes,
-          status: 'COMPLETED'
-        }
-      });
-
-      let receipt = null;
-      if (type === 'TICKET') {
-        receipt = await generateReceiptForSource(tx, entrepriseId, type, operation.id);
+    // Create Service Operation directly (LibSQL does not support interactive transactions)
+    const operation = await prisma.serviceOperation.create({
+      data: {
+        entrepriseId,
+        userId,
+        clientId,
+        type,
+        subType,
+        provider,
+        amount: parseFloat(amount),
+        fees: fees ? parseFloat(fees) : 0,
+        phone,
+        reference,
+        passengerName,
+        flightNumber,
+        departure,
+        destination,
+        flightDate,
+        airline,
+        ticketPrice: ticketPrice ? parseFloat(ticketPrice) : null,
+        commissionType,
+        commission: commission ? parseFloat(commission) : null,
+        notes,
+        status: 'COMPLETED'
       }
-
-      return { ...operation, receipt };
     });
 
-    res.status(201).json(result);
+    // Generate Receipt best effort
+    let receipt = null;
+    try {
+      if (type === 'TICKET') {
+        receipt = await generateReceiptForSource(prisma as any, entrepriseId, type, operation.id);
+      }
+    } catch (receiptErr) {
+      console.warn('Receipt generation failed (non-critical):', receiptErr);
+    }
+
+    res.status(201).json({ ...operation, receipt });
 
   } catch (error) {
     console.error('Service Engine Error:', error);
