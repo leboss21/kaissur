@@ -1,35 +1,19 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy dependency definitions
+# Copy package definitions and prisma schema
 COPY backend/package*.json ./
 COPY backend/prisma ./prisma/
 
-# Install dependencies including devDependencies for build (with legacy peer deps fallback)
-RUN npm install
+# Install all dependencies with legacy peer deps support
+RUN npm install --legacy-peer-deps
 
 # Copy backend source code
 COPY backend/ .
 
-# Generate Prisma Client and compile TypeScript
+# Build application
 RUN npm run build
-
-FROM node:20-alpine AS runner
-
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-# Copy built application and production dependencies
-COPY backend/package*.json ./
-RUN npm install --omit=dev
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 5000
 
