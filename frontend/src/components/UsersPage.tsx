@@ -1,0 +1,139 @@
+import React, { useState, useEffect } from 'react';
+import { Shield, ShieldAlert, UserPlus, X } from 'lucide-react';
+import { api } from '../lib/api';
+
+export const UsersPage = () => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', role: 'CASHIER', password: '' });
+  const [error, setError] = useState('');
+
+  const fetchUsers = () => {
+    api.getUsers().then(res => {
+      setUsers(res);
+      setLoading(false);
+    }).catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const toggleRole = async (id: string, currentRole: string) => {
+    try {
+      const newRole = currentRole === 'ADMIN' ? 'CASHIER' : 'ADMIN';
+      await api.updateUserRole(id, newRole);
+      fetchUsers();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api.createUser(form);
+      setShowModal(false);
+      setForm({ name: '', email: '', role: 'CASHIER', password: '' });
+      fetchUsers();
+    } catch (err: any) {
+      setError(err.message || 'Erreur de création');
+    }
+  };
+
+  return (
+    <div className="p-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-3xl font-bold text-white">Équipe</h2>
+          <p className="text-textMuted mt-1">Gestion des rôles et accès</p>
+        </div>
+        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+          <UserPlus className="w-4 h-4" /> Ajouter un utilisateur
+        </button>
+      </div>
+
+      <div className="glass-panel p-6">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-textMuted border-b border-white/10">
+                <th className="pb-3 pr-4">Utilisateur</th>
+                <th className="pb-3 pr-4">Email</th>
+                <th className="pb-3 pr-4">Rôle actuel</th>
+                <th className="pb-3">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {users.map(u => (
+                <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                  <td className="py-4 pr-4 text-white font-medium">{u.name}</td>
+                  <td className="py-4 pr-4 text-textMuted">{u.email}</td>
+                  <td className="py-4 pr-4">
+                    {u.role === 'ADMIN' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        <ShieldAlert className="w-3.5 h-3.5" /> Administrateur
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <Shield className="w-3.5 h-3.5" /> Caissier
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-4">
+                    <button onClick={() => toggleRole(u.id, u.role)} className="text-xs text-primary hover:underline">
+                      Changer en {u.role === 'ADMIN' ? 'Caissier' : 'Administrateur'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-textMuted">Aucun utilisateur trouvé</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-textMuted hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-white mb-6">Nouvel Utilisateur</h3>
+            
+            {error && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">{error}</div>}
+
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Nom complet</label>
+                <input type="text" required className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Adresse Email</label>
+                <input type="email" required className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Mot de passe</label>
+                <input type="password" required className="glass-input w-full" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Rôle initial</label>
+                <select className="glass-input w-full" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                  <option value="CASHIER">Caissier</option>
+                  <option value="ADMIN">Administrateur</option>
+                </select>
+              </div>
+              <button type="submit" className="btn-primary w-full mt-2">Créer l'utilisateur</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

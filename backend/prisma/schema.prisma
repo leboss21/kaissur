@@ -1,0 +1,253 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Entreprise {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  logoUrl   String?
+  taxId     String?
+  exchangeMargin Float @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  transactions      Transaction[]
+  clients           Client[]
+  cashRegisters     CashRegister[]
+  serviceOperations ServiceOperation[]
+  serviceProviders  ServiceProvider[]
+  sessions          CashRegisterSession[]
+  reports           DailyReport[]
+  receipts          Receipt[]
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  name         String?
+  role         String     @default("ADMIN") // ADMIN or CASHIER
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  transactions      Transaction[]
+  serviceOperations ServiceOperation[]
+  sessions          CashRegisterSession[]
+}
+
+model Client {
+  id           String     @id @default(uuid())
+  firstName    String
+  lastName     String
+  identityType String?
+  identityNum  String?
+  phone        String?
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  transactions      Transaction[]
+  serviceOperations ServiceOperation[]
+}
+
+model Currency {
+  code       String   @id
+  name       String
+  symbol     String
+  sellMargin Float    @default(0)   // marge de revente en %
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  exchangeRates ExchangeRate[]
+  cashRegisters CashRegister[]
+}
+
+model ExchangeRate {
+  id         String   @id @default(uuid())
+  currencyId String
+  currency   Currency @relation(fields: [currencyId], references: [code], onDelete: Cascade)
+  buyRate    Float
+  sellRate   Float
+  date       DateTime @default(now())
+
+  @@unique([currencyId, date])
+}
+
+model CashRegister {
+  id           String     @id @default(uuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  currencyId   String
+  currency     Currency   @relation(fields: [currencyId], references: [code], onDelete: Cascade)
+  balance      Float      @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([entrepriseId, currencyId])
+}
+
+model Transaction {
+  id           String     @id @default(uuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  clientId     String?
+  client       Client?    @relation(fields: [clientId], references: [id])
+
+  fromCurrencyCode String
+  toCurrencyCode   String
+  amountIn         Float
+  amountOut        Float
+  exchangeRate     Float
+
+  type   String @default("EXCHANGE")
+  status String @default("COMPLETED")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Opérations de services (Mobile Money, Crédits, Billets de vol)
+model ServiceOperation {
+  id           String     @id @default(uuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  clientId     String?
+  client       Client?    @relation(fields: [clientId], references: [id])
+
+  // Type principal et sous-type
+  // type: MOBILE_MONEY | CREDIT_TRANSFER | FLIGHT_TICKET
+  // subType: DEPOSIT | WITHDRAWAL (mobile money uniquement)
+  type    String
+  subType String?
+
+  // Fournisseur / Opérateur
+  // MOOV_MONEY | MIXX_BY_YAS | MOOV | MIXX | (compagnie pour billets)
+  provider String
+
+  // Montants en XOF
+  amount Float          // Montant principal
+  fees   Float  @default(0) // Frais saisis manuellement par l'agent
+
+  // Mobile money & crédits
+  phone     String? // Numéro de téléphone du bénéficiaire
+  reference String? // Référence de la transaction opérateur
+
+  // Billets de vol uniquement
+  passengerName  String?
+  flightNumber   String?
+  departure      String?   // Ville/aéroport de départ
+  destination    String?   // Ville/aéroport d'arrivée
+  flightDate     String?   // Date du vol (stockée en texte pour SQLite)
+  airline        String?   // Compagnie aérienne
+  ticketPrice    Float?    // Prix du billet facturé au client
+  commissionType String?   // PERCENT | FIXED
+  commission     Float?    // Valeur commission (% ou montant fixe)
+
+  notes  String?
+  status String   @default("COMPLETED")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CashRegisterSession {
+  id           String     @id @default(uuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  
+  date         DateTime   @default(now())
+  status       String     @default("OPEN") // OPEN or CLOSED
+  
+  balances     SessionBalance[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model SessionBalance {
+  id           String     @id @default(uuid())
+  sessionId    String
+  session      CashRegisterSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  // Account ID like "XOF", "USD", "TMONEY", "FLOOZ", "MOOV", "YAS"
+  accountId    String
+  
+  startingBalance        Float @default(0)
+  expectedEndingBalance  Float @default(0)
+  declaredEndingBalance  Float?
+  discrepancy            Float?
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([sessionId, accountId])
+}
+
+model DailyReport {
+  id           String     @id @default(uuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  
+  date         DateTime   @default(now())
+  
+  // Storing aggregate statistics for history
+  totalExchangeIn  Float @default(0)
+  totalExchangeOut Float @default(0)
+  totalMobileMoney Float @default(0)
+  totalMobileMoneyDeposits Float @default(0)
+  totalMobileMoneyWithdrawals Float @default(0)
+  totalCredit      Float @default(0)
+  totalTickets     Float @default(0)
+  
+  // Can be a JSON dump or a link to a file if needed
+  reportData   String?
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model ServiceProvider {
+  id           String     @id @default(uuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  type         String     // MOBILE_MONEY or CREDIT
+  name         String
+  color        String?    // Configuration de couleur UI
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Receipt {
+  id             String     @id @default(uuid())
+  receiptNumber  String     @unique // e.g., REC-2026-00001
+  entrepriseId   String
+  entreprise     Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  
+  sourceType     String     // EXCHANGE, MOBILE_MONEY, CREDIT, TICKET
+  sourceId       String     // Transaction ID or ServiceOperation ID
+  
+  createdAt      DateTime   @default(now())
+  
+  @@unique([entrepriseId, receiptNumber])
+}
