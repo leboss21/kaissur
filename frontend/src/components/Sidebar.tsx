@@ -13,7 +13,7 @@ const navItems = [
   { name: 'Billetterie', icon: Plane, path: '/services/tickets', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
   { name: 'Reçus', icon: ReceiptText, path: '/receipts', roles: ['ADMIN', 'CASHIER'] },
   { name: 'Clients', icon: Users, path: '/clients', roles: ['ADMIN', 'CASHIER'] },
-  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN'] },
+  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'CASHIER'] },
   { name: 'Équipe', icon: UserCog, path: '/users', roles: ['ADMIN'] },
   { name: 'Paramètres', icon: Settings, path: '/settings', roles: ['ADMIN', 'CASHIER'] },
 ];

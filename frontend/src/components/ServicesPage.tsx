@@ -214,13 +214,114 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-textMuted text-sm mb-1.5">Départ *</label>
-              <input className="glass-input w-full" type="text" placeholder="LFW" value={form.departure || ''} onChange={e => setForm({ ...form, departure: e.target.value })} required />
+              <label className="block text-textMuted text-sm mb-1.5">Départ (Ville / Aéroport) *</label>
+              <input
+                className="glass-input w-full uppercase"
+                type="text"
+                list="airports-list"
+                placeholder="ex: LFW - Lomé"
+                value={form.departure || 'LFW - Lomé'}
+                onChange={e => setForm({ ...form, departure: e.target.value })}
+                required
+              />
             </div>
             <div>
-              <label className="block text-textMuted text-sm mb-1.5">Destination *</label>
-              <input className="glass-input w-full" type="text" placeholder="CDG" value={form.destination || ''} onChange={e => setForm({ ...form, destination: e.target.value })} required />
+              <label className="block text-textMuted text-sm mb-1.5">Destination (Ville / Aéroport) *</label>
+              <input
+                className="glass-input w-full uppercase"
+                type="text"
+                list="airports-list"
+                placeholder="ex: CDG - Paris"
+                value={form.destination || ''}
+                onChange={e => setForm({ ...form, destination: e.target.value })}
+                required
+              />
             </div>
+            <datalist id="airports-list">
+              {/* Afrique de l'Ouest & Centrale */}
+              <option value="LFW - Lomé (Togo)" />
+              <option value="COO - Cotonou (Bénin)" />
+              <option value="ABJ - Abidjan (Côte d'Ivoire)" />
+              <option value="ACC - Accra (Ghana)" />
+              <option value="DKR - Dakar (Sénégal)" />
+              <option value="OUA - Ouagadougou (Burkina Faso)" />
+              <option value="BKO - Bamako (Mali)" />
+              <option value="NIM - Niamey (Niger)" />
+              <option value="LOS - Lagos (Nigéria)" />
+              <option value="ABV - Abuja (Nigéria)" />
+              <option value="ROB - Monrovia (Libéria)" />
+              <option value="FNA - Freetown (Sierra Leone)" />
+              <option value="CKY - Conakry (Guinée)" />
+              <option value="OXB - Bissau (Guinée-Bissau)" />
+              <option value="RAI - Praia (Cap-Vert)" />
+              <option value="DLA - Douala (Cameroun)" />
+              <option value="NSI - Yaoundé (Cameroun)" />
+              <option value="LBV - Libreville (Gabon)" />
+              <option value="BZV - Brazzaville (Congo)" />
+              <option value="PNR - Pointe-Noire (Congo)" />
+              <option value="FIH - Kinshasa (RDC)" />
+              <option value="FDU - Bandundu (RDC)" />
+              <option value="NDJ - N'Djamena (Tchad)" />
+              <option value="SSG - Malabo (Guinée Équatoriale)" />
+              <option value="TMS - São Tomé (São Tomé-et-Príncipe)" />
+              {/* Afrique du Nord, Est & Sud */}
+              <option value="CMN - Casablanca (Maroc)" />
+              <option value="TUN - Tunis (Tunisie)" />
+              <option value="ALG - Alger (Algérie)" />
+              <option value="CAI - Le Caire (Égypte)" />
+              <option value="ADD - Addis-Abeba (Éthiopie)" />
+              <option value="NBO - Nairobi (Kenya)" />
+              <option value="EBB - Entebbe/Kampala (Ouganda)" />
+              <option value="KGL - Kigali (Rwanda)" />
+              <option value="DAR - Dar es Salaam (Tanzanie)" />
+              <option value="JNB - Johannesburg (Afrique du Sud)" />
+              <option value="CPT - Le Cap (Afrique du Sud)" />
+              <option value="MRU - Maurice (Île Maurice)" />
+              {/* Europe */}
+              <option value="CDG - Paris Charles de Gaulle (France)" />
+              <option value="ORY - Paris Orly (France)" />
+              <option value="LYS - Lyon (France)" />
+              <option value="MRS - Marseille (France)" />
+              <option value="NCE - Nice (France)" />
+              <option value="BRU - Bruxelles (Belgique)" />
+              <option value="GVA - Genève (Suisse)" />
+              <option value="ZRH - Zurich (Suisse)" />
+              <option value="LHR - Londres Heathrow (Royaume-Uni)" />
+              <option value="LGW - Londres Gatwick (Royaume-Uni)" />
+              <option value="FRA - Francfort (Allemagne)" />
+              <option value="MUC - Munich (Allemagne)" />
+              <option value="AMS - Amsterdam (Pays-Bas)" />
+              <option value="MAD - Madrid (Espagne)" />
+              <option value="BCN - Barcelone (Espagne)" />
+              <option value="LIS - Lisbonne (Portugal)" />
+              <option value="FCO - Rome Fiumicino (Italie)" />
+              <option value="MXP - Milan Malpensa (Italie)" />
+              <option value="VIE - Vienne (Autriche)" />
+              <option value="IST - Istanbul (Turquie)" />
+              {/* Moyen-Orient & Asie */}
+              <option value="DXB - Dubaï (Émirats Arabe Unis)" />
+              <option value="AUH - Abou Dabi (Émirats Arabe Unis)" />
+              <option value="DOH - Doha (Qatar)" />
+              <option value="RUH - Riyad (Arabie Saoudite)" />
+              <option value="JED - Djeddah (Arabie Saoudite)" />
+              <option value="BOM - Mumbai (Inde)" />
+              <option value="DEL - New Delhi (Inde)" />
+              <option value="CAN - Guangzhou / Canton (Chine)" />
+              <option value="PEK - Pékin (Chine)" />
+              <option value="PVG - Shanghai (Chine)" />
+              <option value="BKK - Bangkok (Thaïlande)" />
+              {/* Amériques */}
+              <option value="JFK - New York JFK (USA)" />
+              <option value="EWR - New York Newark (USA)" />
+              <option value="IAD - Washington Dulles (USA)" />
+              <option value="ATL - Atlanta (USA)" />
+              <option value="MIA - Miami (USA)" />
+              <option value="ORD - Chicago O'Hare (USA)" />
+              <option value="IAH - Houston (USA)" />
+              <option value="YUL - Montréal (Canada)" />
+              <option value="YYZ - Toronto (Canada)" />
+              <option value="GRU - São Paulo (Brésil)" />
+            </datalist>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

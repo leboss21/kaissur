@@ -48,18 +48,20 @@ export const generateDailyReport = async (req: Request, res: Response) => {
     // Detailed breakdown by operator
     const mobileMoneyByProvider: Record<string, { total: number; count: number; deposits: number; withdrawals: number }> = {};
     ops.filter(o => o.type === 'MOBILE_MONEY').forEach(o => {
-      if (!mobileMoneyByProvider[o.provider]) mobileMoneyByProvider[o.provider] = { total: 0, count: 0, deposits: 0, withdrawals: 0 };
-      mobileMoneyByProvider[o.provider].total += o.amount;
-      mobileMoneyByProvider[o.provider].count++;
-      if (o.subType === 'DEPOSIT') mobileMoneyByProvider[o.provider].deposits += o.amount;
-      if (o.subType === 'WITHDRAWAL') mobileMoneyByProvider[o.provider].withdrawals += o.amount;
+      const p = mobileMoneyByProvider[o.provider] || { total: 0, count: 0, deposits: 0, withdrawals: 0 };
+      p.total += o.amount;
+      p.count++;
+      if (o.subType === 'DEPOSIT') p.deposits += o.amount;
+      if (o.subType === 'WITHDRAWAL') p.withdrawals += o.amount;
+      mobileMoneyByProvider[o.provider] = p;
     });
 
     const creditByProvider: Record<string, { total: number; count: number }> = {};
     ops.filter(o => o.type === 'CREDIT').forEach(o => {
-      if (!creditByProvider[o.provider]) creditByProvider[o.provider] = { total: 0, count: 0 };
-      creditByProvider[o.provider].total += o.amount;
-      creditByProvider[o.provider].count++;
+      const p = creditByProvider[o.provider] || { total: 0, count: 0 };
+      p.total += o.amount;
+      p.count++;
+      creditByProvider[o.provider] = p;
     });
 
     const ticketsByAirline: Record<string, { total: number; count: number; commission: number }> = {};

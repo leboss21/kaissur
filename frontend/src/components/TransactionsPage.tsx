@@ -91,6 +91,33 @@ export const TransactionsPage = () => {
             <h3 className="text-xl font-bold text-white mb-6">Nouvelle transaction d'échange</h3>
             {error && <div className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-3 mb-4 text-sm">{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Type de transaction *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, type: 'BUY' })}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${
+                      form.type === 'BUY'
+                        ? 'bg-emerald-500 text-black border-emerald-500'
+                        : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    Achat de devise (Client vend)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, type: 'SELL' })}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${
+                      form.type === 'SELL'
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    Vente de devise (Client achète)
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-textMuted text-sm mb-1.5">Devise remise *</label>
@@ -201,6 +228,7 @@ export const TransactionsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="text-left text-textMuted text-sm border-b border-white/10">
+                  <th className="pb-3 pr-4">Type</th>
                   <th className="pb-3 pr-4">Client</th>
                   <th className="pb-3 pr-4">Échange</th>
                   <th className="pb-3 pr-4">Remis</th>
@@ -213,6 +241,17 @@ export const TransactionsPage = () => {
               <tbody className="divide-y divide-white/5">
                 {transactions.map(t => (
                   <tr key={t.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-4 pr-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                        t.type === 'BUY'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : t.type === 'SELL'
+                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                          : 'bg-white/10 text-white/70'
+                      }`}>
+                        {t.type === 'BUY' ? 'Achat' : t.type === 'SELL' ? 'Vente' : 'Échange'}
+                      </span>
+                    </td>
                     <td className="py-4 pr-4 text-white">
                       {t.client ? `${t.client.firstName} ${t.client.lastName}` : <span className="text-textMuted italic">Anonyme</span>}
                     </td>

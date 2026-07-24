@@ -46,7 +46,7 @@ export const createProvider = async (req: Request, res: Response) => {
 export const deleteProvider = async (req: Request, res: Response) => {
   try {
     const entrepriseId = (req as any).entrepriseId;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     await prisma.serviceProvider.delete({
       where: { id, entrepriseId }

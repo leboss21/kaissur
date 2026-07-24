@@ -13,6 +13,7 @@ import reportRoutes from './routes/report.js';
 import userRoutes from './routes/user.js';
 import receiptRoutes from './routes/receipt.js';
 import entrepriseRoutes from './routes/entreprise.js';
+import providerRoutes from './routes/provider.js';
 const app = express();
 app.use(cors());
 app.use(helmet());
@@ -30,6 +31,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/entreprise', entrepriseRoutes);
+app.use('/api/providers', providerRoutes);
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running correctly (Option A)' });
 });

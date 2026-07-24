@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { getCurrencies, createCurrency } from '../controllers/currency.js';
-// Note: In a real app, createCurrency should have Admin authorization middleware
+import { getCurrencies, createCurrency, updateCurrencyMargin } from '../controllers/currency.js';
 const router = Router();
 router.get('/', getCurrencies);
 router.post('/', createCurrency);
+router.patch('/:code/margin', updateCurrencyMargin);
 export default router;
 //# sourceMappingURL=currency.js.map

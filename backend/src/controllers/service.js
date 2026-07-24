@@ -56,7 +56,10 @@ export const createServiceOperation = async (req, res) => {
                     status: 'COMPLETED'
                 }
             });
-            const receipt = await generateReceiptForSource(tx, entrepriseId, type, operation.id);
+            let receipt = null;
+            if (type === 'TICKET') {
+                receipt = await generateReceiptForSource(tx, entrepriseId, type, operation.id);
+            }
             return { ...operation, receipt };
         });
         res.status(201).json(result);

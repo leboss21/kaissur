@@ -63,7 +63,7 @@ export const closeSession = async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     if (!entrepriseId || !userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { sessionId } = req.params;
+    const sessionId = req.params.sessionId as string;
     const { declaredBalances } = req.body; 
 
     const session = await prisma.cashRegisterSession.findUnique({
@@ -74,7 +74,7 @@ export const closeSession = async (req: Request, res: Response) => {
     if (!session || session.userId !== userId) return res.status(404).json({ error: 'Session not found' });
 
     const updatePromises = declaredBalances.map(async (decl: any) => {
-      const bal = session.balances.find(b => b.accountId === decl.accountId);
+      const bal = session.balances.find((b: any) => b.accountId === decl.accountId);
       if (bal) {
         const discrepancy = decl.amount - bal.expectedEndingBalance;
         return prisma.sessionBalance.update({

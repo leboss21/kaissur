@@ -3,14 +3,14 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy dependency definitions
-COPY package*.json ./
-COPY prisma ./prisma/
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
 
 # Install dependencies including devDependencies for build
 RUN npm ci
 
-# Copy source code
-COPY . .
+# Copy backend source code
+COPY backend/ .
 
 # Generate Prisma Client and compile TypeScript
 RUN npm run build
@@ -22,7 +22,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Copy built application and production dependencies
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci --only=production
 
 COPY --from=builder /app/dist ./dist

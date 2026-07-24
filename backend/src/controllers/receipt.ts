@@ -21,8 +21,9 @@ export const getReceiptDetails = async (req: Request, res: Response) => {
     const entrepriseId = (req as any).entrepriseId;
     if (!entrepriseId) return res.status(401).json({ error: 'Unauthorized' });
 
+    const receiptId = req.params.id as string;
     const receipt = await prisma.receipt.findUnique({
-      where: { id: req.params.id }
+      where: { id: receiptId }
     });
 
     if (!receipt || receipt.entrepriseId !== entrepriseId) {

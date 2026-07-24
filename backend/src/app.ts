@@ -17,8 +17,12 @@ import providerRoutes from './routes/provider.js';
 
 const app = express();
 
-app.use(cors());
-app.use(helmet());
+app.use(cors({
+  origin: '*', // Ou spécifiez votre domaine vercel (ex: 'https://votre-app.vercel.app')
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-entreprise-id']
+}));
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(morgan('dev'));
 app.use(express.json());
 
