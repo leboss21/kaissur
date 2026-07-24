@@ -8,22 +8,19 @@ declare global {
 }
 
 const initializePrisma = () => {
-  const connectionString = process.env.DATABASE_URL || 'file:./dev.db';
+  const connectionString = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || 'file:./dev.db';
   const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  // We initialize the libSQL client
-  const clientConfig: { url: string; authToken?: string } = {
-    url: connectionString,
-  };
-
-  if (authToken) {
-    clientConfig.authToken = authToken;
+  if (connectionString.startsWith('libsql://')) {
+    const libsql = createClient({
+      url: connectionString,
+      ...(authToken ? { authToken } : {}),
+    });
+    const adapter = new PrismaLibSQL(libsql);
+    return new PrismaClient({ adapter });
   }
 
-  const libsql = createClient(clientConfig);
-  const adapter = new PrismaLibSQL(libsql);
-  
-  return new PrismaClient({ adapter });
+  return new PrismaClient();
 };
 
 export const prisma = global.prisma || initializePrisma();
