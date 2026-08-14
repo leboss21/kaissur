@@ -14,11 +14,13 @@ import userRoutes from './routes/user.js';
 import receiptRoutes from './routes/receipt.js';
 import entrepriseRoutes from './routes/entreprise.js';
 import providerRoutes from './routes/provider.js';
+import authRoutes from './routes/auth.js';
+import superadminRoutes from './routes/superadmin.js';
 
 const app = express();
 
 app.use(cors({
-  origin: '*', // Ou spécifiez votre domaine vercel (ex: 'https://votre-app.vercel.app')
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-entreprise-id']
 }));
@@ -27,6 +29,8 @@ app.use(morgan('dev'));
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/superadmin', superadminRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/currencies', currencyRoutes);
 app.use('/api/rates', rateRoutes);

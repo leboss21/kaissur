@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
+const DEFAULT_PASSWORD_HASH = bcryptjs.hashSync('Mdp12345', 10);
 
 async function main() {
   console.log('Seeding database...');
@@ -20,14 +22,14 @@ async function main() {
   });
   console.log('✔ Entreprise created:', entreprise.name);
 
-  // Create the demo user
+  // Create the demo admin user
   const user = await prisma.user.upsert({
     where: { email: 'admin@kaissur.tg' },
-    update: {},
+    update: { passwordHash: DEFAULT_PASSWORD_HASH },
     create: {
       id: 'user-test-id',
       email: 'admin@kaissur.tg',
-      passwordHash: 'demo-hash',
+      passwordHash: DEFAULT_PASSWORD_HASH,
       name: 'Administrateur',
       role: 'ADMIN',
       entrepriseId: 'demo-tenant',

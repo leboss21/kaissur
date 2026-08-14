@@ -1,34 +1,69 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { api } from './api.js';
 
-type Role = 'ADMIN' | 'CASHIER';
+type Role = 'SUPER_ADMIN' | 'ADMIN' | 'CASHIER' | 'DIRECTEUR';
 
 interface User {
   id: string;
   name: string;
+  email: string;
   role: Role;
+  entrepriseId?: string | null;
+  entrepriseName?: string;
 }
 
 interface AuthContextType {
-  user: User;
-  switchRole: (role: Role) => void;
+  user: User | null;
+  token: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User>({
-    id: 'user-test-id',
-    name: 'Demo User',
-    role: 'ADMIN' // Default to admin for testing
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('kaissur_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   });
 
-  const switchRole = (role: Role) => {
-    setUser(prev => ({ ...prev, role }));
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('kaissur_token');
+  });
+
+  const login = async (email: string, password: string) => {
+    try {
+      const data = await api.login({ email, password });
+      if (data && data.token && data.user) {
+        localStorage.setItem('kaissur_token', data.token);
+        localStorage.setItem('kaissur_user', JSON.stringify(data.user));
+        setToken(data.token);
+        setUser(data.user);
+      } else {
+        throw new Error('Données de connexion invalides.');
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('kaissur_token');
+    localStorage.removeItem('kaissur_user');
+    setToken(null);
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, switchRole }}>
+    <AuthContext.Provider value={{ user, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

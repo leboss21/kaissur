@@ -1,17 +1,21 @@
 import { Router } from 'express';
-import { getSession, openSession, closeSession } from '../controllers/session.js';
+import { getSession, openSession, closeSession, getAllSessions } from '../controllers/session.js';
+import { requireTenant } from '../middleware/tenant.js';
+import { requireNotDirecteur } from '../middleware/roles.js';
 
 const router = Router();
 
-// Middleware placeholder for extracting auth
-router.use((req, res, next) => {
-  (req as any).entrepriseId = 'demo-tenant';
-  (req as any).userId = 'user-test-id';
-  next();
-});
+// Toutes les routes session nécessitent une authentification JWT valide
+router.use(requireTenant);
 
+// Lecture de la session courante — accessible à tous les rôles authentifiés
 router.get('/current', getSession);
-router.post('/open', openSession);
-router.post('/:sessionId/close', closeSession);
+
+// Vue admin/directeur : toutes les sessions de l'entreprise (lecture seule)
+router.get('/all', getAllSessions);
+
+// Ouverture et clôture — interdites aux directeurs (lecture seule)
+router.post('/open', requireNotDirecteur, openSession);
+router.post('/:sessionId/close', requireNotDirecteur, closeSession);
 
 export default router;

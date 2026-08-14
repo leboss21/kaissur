@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRightLeft, Plus, CheckCircle2, Clock, Eye, XCircle, FileText } from 'lucide-react';
+import { Plus, CheckCircle2, Clock, Search, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api';
 import type { Transaction, Currency, Client, CreateTransactionPayload } from '../lib/api';
 import { generateReceiptPDF } from '../lib/pdfGenerator';
 import { AmountInput } from './ui/AmountInput';
 
 const DEMO_ENTREPRISE_ID = 'demo-tenant';
+const PAGE_SIZE = 10;
 
 export const TransactionsPage = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -13,12 +14,26 @@ export const TransactionsPage = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [exchangeMargin, setExchangeMargin] = useState(0);
   const [loading, setLoading] = useState(true);
+  
+  // Filters & Pagination
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterCurrency, setFilterCurrency] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // New Transaction Form state
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<CreateTransactionPayload>({
-    fromCurrencyCode: '', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'EXCHANGE'
+    fromCurrencyCode: '', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'BUY'
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Edit Transaction state
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const fetchAll = () => {
     Promise.all([
@@ -51,7 +66,7 @@ export const TransactionsPage = () => {
       const payload = { 
         ...form, 
         clientId: form.clientId || undefined,
-        exchangeRate: appliedRate // On envoie le taux final appliqué au backend
+        exchangeRate: appliedRate
       };
       const result = await api.createTransaction(payload, DEMO_ENTREPRISE_ID);
       
@@ -63,28 +78,73 @@ export const TransactionsPage = () => {
         generateReceiptPDF(receiptData, false);
       }
       
-      setForm({ fromCurrencyCode: '', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'EXCHANGE' });
+      setForm({ fromCurrencyCode: '', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'BUY' });
       fetchAll();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Erreur lors de la création de la transaction.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      const updated = await api.updateTransaction(editingTransaction.id, editForm, DEMO_ENTREPRISE_ID);
+      setTransactions(transactions.map(t => t.id === updated.id ? updated : t));
+      setEditingTransaction(null);
+    } catch (err: any) {
+      setEditError(err.message || 'Erreur lors de la modification.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const openEditModal = (t: Transaction) => {
+    setEditingTransaction(t);
+    setEditForm({
+      fromCurrencyCode: t.fromCurrencyCode,
+      toCurrencyCode: t.toCurrencyCode,
+      amountIn: t.amountIn,
+      exchangeRate: t.exchangeRate,
+      clientId: t.clientId || '',
+      type: t.type
+    });
+    setEditError('');
+  };
+
+  // Filtered & Paginated Transactions
+  const filteredTransactions = transactions.filter(t => {
+    const matchesSearch = 
+      (t.client ? `${t.client.firstName} ${t.client.lastName}` : 'Anonyme').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.fromCurrencyCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.toCurrencyCode.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesType = filterType === 'ALL' || t.type === filterType;
+    const matchesCurrency = filterCurrency === 'ALL' || t.fromCurrencyCode === filterCurrency || t.toCurrencyCode === filterCurrency;
+
+    return matchesSearch && matchesType && matchesCurrency;
+  });
+
+  const totalPages = Math.ceil(filteredTransactions.length / PAGE_SIZE) || 1;
+  const paginatedTransactions = filteredTransactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <div className="p-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-white">Transactions</h2>
-          <p className="text-textMuted mt-1">{transactions.length} échange(s) au total</p>
+          <h2 className="text-3xl font-bold text-white">Transactions de Change</h2>
+          <p className="text-textMuted mt-1">{filteredTransactions.length} échange(s) trouvé(s)</p>
         </div>
         <button className="btn-primary flex items-center gap-2" onClick={() => setShowForm(true)}>
           <Plus className="w-4 h-4" /> Nouvel échange
         </button>
       </div>
 
-      {/* Modal nouvel échange */}
+      {/* Modal Nouvel Échange */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-panel p-8 w-full max-w-lg">
@@ -103,7 +163,7 @@ export const TransactionsPage = () => {
                         : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
                     }`}
                   >
-                    Achat de devise (Client vend)
+                    Achat de devise (Le client nous vend)
                   </button>
                   <button
                     type="button"
@@ -114,13 +174,15 @@ export const TransactionsPage = () => {
                         : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
                     }`}
                   >
-                    Vente de devise (Client achète)
+                    Vente de devise (Le client nous achète)
                   </button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-textMuted text-sm mb-1.5">Devise remise *</label>
+                  <label className="block text-textMuted text-sm mb-1.5">
+                    {form.type === 'BUY' ? 'Devise apportée par le client *' : form.type === 'SELL' ? 'Devise payée par le client *' : 'Devise remise *'}
+                  </label>
                   <select 
                     className="glass-input w-full" 
                     value={form.fromCurrencyCode} 
@@ -137,16 +199,13 @@ export const TransactionsPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-textMuted text-sm mb-1.5">Devise reçue *</label>
+                  <label className="block text-textMuted text-sm mb-1.5">
+                    {form.type === 'BUY' ? 'Devise donnée au client *' : form.type === 'SELL' ? 'Devise livrée au client *' : 'Devise reçue *'}
+                  </label>
                   <select 
                     className="glass-input w-full" 
                     value={form.toCurrencyCode} 
-                    onChange={e => {
-                      const code = e.target.value;
-                      const selectedCurr = currencies.find(c => c.code === code);
-                      // On peut aussi appliquer la marge de la devise reçue si pertinent, mais prenons celle de remise en priorité si elle a changé
-                      setForm({ ...form, toCurrencyCode: code });
-                    }} 
+                    onChange={e => setForm({ ...form, toCurrencyCode: e.target.value })} 
                     required
                   >
                     <option value="">Sélectionner...</option>
@@ -156,7 +215,9 @@ export const TransactionsPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-textMuted text-sm mb-1.5">Montant remis *</label>
+                  <label className="block text-textMuted text-sm mb-1.5">
+                    {form.type === 'BUY' ? 'Montant apporté par le client *' : form.type === 'SELL' ? 'Montant payé par le client *' : 'Montant remis *'}
+                  </label>
                   <AmountInput 
                     value={form.amountIn || 0} 
                     onChangeAmount={val => setForm({ ...form, amountIn: val })} 
@@ -177,7 +238,7 @@ export const TransactionsPage = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-textMuted text-sm mb-1.5">Marge (%) *</label>
+                  <label className="block text-textMuted text-sm mb-1.5">Marge (%)</label>
                   <AmountInput 
                     value={form.margin || 0} 
                     onChangeAmount={val => setForm({ ...form, margin: val })} 
@@ -190,10 +251,10 @@ export const TransactionsPage = () => {
                 </div>
               </div>
 
-              {/* Aperçu en direct */}
+              {/* Aperçu clair */}
               {amountOut > 0 && (
                 <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex items-center justify-between">
-                  <span className="text-textMuted text-sm">Le client recevra (après marge)</span>
+                  <span className="text-textMuted text-sm">Le client recevra au total</span>
                   <span className="text-accent font-bold text-lg">{amountOut.toFixed(2)} {form.toCurrencyCode}</span>
                 </div>
               )}
@@ -217,66 +278,177 @@ export const TransactionsPage = () => {
         </div>
       )}
 
+      {/* Modal Edit Transaction */}
+      {editingTransaction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel p-8 w-full max-w-lg">
+            <h3 className="text-xl font-bold text-white mb-6">Modifier la transaction</h3>
+            {editError && <div className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-3 mb-4 text-sm">{editError}</div>}
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Montant apporté par le client</label>
+                <AmountInput 
+                  value={editForm.amountIn || 0} 
+                  onChangeAmount={val => setEditForm({ ...editForm, amountIn: val })} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Taux de change appliqué</label>
+                <AmountInput 
+                  value={editForm.exchangeRate || 0} 
+                  onChangeAmount={val => setEditForm({ ...editForm, exchangeRate: val })} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-textMuted text-sm mb-1.5">Client</label>
+                <select className="glass-input w-full" value={editForm.clientId || ''} onChange={e => setEditForm({ ...editForm, clientId: e.target.value })}>
+                  <option value="">Anonyme</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" className="btn-ghost flex-1" onClick={() => setEditingTransaction(null)}>Annuler</button>
+                <button type="submit" className="btn-primary flex-1" disabled={editSubmitting}>
+                  {editSubmitting ? 'Enregistrement...' : 'Mettre à jour'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Barre de Recherche et Filtres */}
+      <div className="glass-panel p-4 mb-6 flex flex-wrap gap-4 items-center justify-between">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-textMuted" />
+          <input 
+            type="text" 
+            className="glass-input w-full pl-10" 
+            placeholder="Rechercher par client ou devise..." 
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          />
+        </div>
+        <div className="flex gap-3">
+          <select 
+            className="glass-input text-sm" 
+            value={filterType} 
+            onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}
+          >
+            <option value="ALL">Tous les types</option>
+            <option value="BUY">Achat</option>
+            <option value="SELL">Vente</option>
+          </select>
+          <select 
+            className="glass-input text-sm" 
+            value={filterCurrency} 
+            onChange={e => { setFilterCurrency(e.target.value); setCurrentPage(1); }}
+          >
+            <option value="ALL">Toutes les devises</option>
+            {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+          </select>
+        </div>
+      </div>
+
       {/* Tableau des transactions */}
       <div className="glass-panel p-6">
         {loading ? (
           <div className="text-center py-16 text-textMuted">Chargement des transactions...</div>
-        ) : transactions.length === 0 ? (
-          <div className="text-center py-16 text-textMuted">Aucune transaction pour le moment. Cliquez sur « Nouvel échange » pour commencer !</div>
+        ) : paginatedTransactions.length === 0 ? (
+          <div className="text-center py-16 text-textMuted">Aucune transaction trouvée.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-textMuted text-sm border-b border-white/10">
-                  <th className="pb-3 pr-4">Type</th>
-                  <th className="pb-3 pr-4">Client</th>
-                  <th className="pb-3 pr-4">Échange</th>
-                  <th className="pb-3 pr-4">Remis</th>
-                  <th className="pb-3 pr-4">Reçu</th>
-                  <th className="pb-3 pr-4">Taux</th>
-                  <th className="pb-3 pr-4">Statut</th>
-                  <th className="pb-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {transactions.map(t => (
-                  <tr key={t.id} className="hover:bg-white/5 transition-colors">
-                    <td className="py-4 pr-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        t.type === 'BUY'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : t.type === 'SELL'
-                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          : 'bg-white/10 text-white/70'
-                      }`}>
-                        {t.type === 'BUY' ? 'Achat' : t.type === 'SELL' ? 'Vente' : 'Échange'}
-                      </span>
-                    </td>
-                    <td className="py-4 pr-4 text-white">
-                      {t.client ? `${t.client.firstName} ${t.client.lastName}` : <span className="text-textMuted italic">Anonyme</span>}
-                    </td>
-                    <td className="py-4 pr-4">
-                      <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs font-mono text-white">
-                        {t.fromCurrencyCode} → {t.toCurrencyCode}
-                      </span>
-                    </td>
-                    <td className="py-4 pr-4 font-mono text-white">{t.amountIn.toFixed(2)}</td>
-                    <td className="py-4 pr-4 font-mono text-accent">{t.amountOut.toFixed(2)}</td>
-                    <td className="py-4 pr-4 text-textMuted font-mono text-sm">{t.exchangeRate.toFixed(4)}</td>
-                    <td className="py-4 pr-4">
-                      <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg w-fit ${
-                        t.status === 'COMPLETED' ? 'bg-accent/10 text-accent' : 'bg-yellow-500/10 text-yellow-400'
-                      }`}>
-                        {t.status === 'COMPLETED' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                        {t.status === 'COMPLETED' ? 'Validé' : 'En attente'}
-                      </span>
-                    </td>
-                    <td className="py-4 text-textMuted text-sm">{new Date(t.createdAt).toLocaleDateString('fr-FR')}</td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-textMuted text-sm border-b border-white/10">
+                    <th className="pb-3 pr-4">Type</th>
+                    <th className="pb-3 pr-4">Client</th>
+                    <th className="pb-3 pr-4">Échange</th>
+                    <th className="pb-3 pr-4">Montant remis</th>
+                    <th className="pb-3 pr-4">Montant reçu</th>
+                    <th className="pb-3 pr-4">Taux</th>
+                    <th className="pb-3 pr-4">Statut</th>
+                    <th className="pb-3 pr-4">Date</th>
+                    <th className="pb-3 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {paginatedTransactions.map(t => (
+                    <tr key={t.id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-4 pr-4">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          t.type === 'BUY'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : t.type === 'SELL'
+                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            : 'bg-white/10 text-white/70'
+                        }`}>
+                          {t.type === 'BUY' ? 'Achat' : t.type === 'SELL' ? 'Vente' : 'Échange'}
+                        </span>
+                      </td>
+                      <td className="py-4 pr-4 text-white">
+                        {t.client ? `${t.client.firstName} ${t.client.lastName}` : <span className="text-textMuted italic">Anonyme</span>}
+                      </td>
+                      <td className="py-4 pr-4">
+                        <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs font-mono text-white">
+                          {t.fromCurrencyCode} → {t.toCurrencyCode}
+                        </span>
+                      </td>
+                      <td className="py-4 pr-4 font-mono text-white">{t.amountIn.toLocaleString('fr-FR')} {t.fromCurrencyCode}</td>
+                      <td className="py-4 pr-4 font-mono text-accent">{t.amountOut.toLocaleString('fr-FR')} {t.toCurrencyCode}</td>
+                      <td className="py-4 pr-4 text-textMuted font-mono text-sm">{t.exchangeRate.toFixed(4)}</td>
+                      <td className="py-4 pr-4">
+                        <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg w-fit ${
+                          t.status === 'COMPLETED' ? 'bg-accent/10 text-accent' : 'bg-yellow-500/10 text-yellow-400'
+                        }`}>
+                          {t.status === 'COMPLETED' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                          {t.status === 'COMPLETED' ? 'Validé' : 'En attente'}
+                        </span>
+                      </td>
+                      <td className="py-4 pr-4 text-textMuted text-sm">{new Date(t.createdAt).toLocaleDateString('fr-FR')}</td>
+                      <td className="py-4 text-right">
+                        <button 
+                          onClick={() => openEditModal(t)}
+                          className="btn-ghost text-xs p-1.5 hover:bg-white/10 rounded-lg inline-flex items-center gap-1"
+                          title="Modifier"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-primary" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+                <span className="text-textMuted text-sm">
+                  Page {currentPage} sur {totalPages} ({filteredTransactions.length} éléments)
+                </span>
+                <div className="flex items-center gap-2">
+                  <button 
+                    disabled={currentPage === 1} 
+                    onClick={() => setCurrentPage(p => p - 1)}
+                    className="btn-ghost p-2 disabled:opacity-30"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button 
+                    disabled={currentPage === totalPages} 
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="btn-ghost p-2 disabled:opacity-30"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

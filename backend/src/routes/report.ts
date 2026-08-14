@@ -1,16 +1,15 @@
 import { Router } from 'express';
-import { getReports, generateDailyReport, getMonthlyReport } from '../controllers/report.js';
+import { getReports, generateDailyReport, getMonthlyReport, getConsolidatedReport } from '../controllers/report.js';
+import { requireTenant } from '../middleware/tenant.js';
+import { requireNotDirecteur } from '../middleware/roles.js';
 
 const router = Router();
 
-router.use((req, res, next) => {
-  (req as any).entrepriseId = 'demo-tenant';
-  (req as any).userId = 'user-test-id';
-  next();
-});
+router.use(requireTenant);
 
 router.get('/', getReports);
-router.post('/generate', generateDailyReport);
+router.post('/generate', requireNotDirecteur, generateDailyReport);
 router.get('/monthly', getMonthlyReport);
+router.get('/consolidated', getConsolidatedReport);
 
 export default router;

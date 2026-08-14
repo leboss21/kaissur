@@ -17,7 +17,9 @@ model Entreprise {
   email     String?
   logoUrl   String?
   taxId     String?
+  status    String   @default("ACTIVE") // ACTIVE or SUSPENDED
   exchangeMargin Float @default(0)
+  mainCashBalance Float @default(0)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -31,22 +33,24 @@ model Entreprise {
   sessions          CashRegisterSession[]
   reports           DailyReport[]
   receipts          Receipt[]
+  mainCashSupplies  MainCashSupply[]
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
+  id           String      @id @default(uuid())
+  email        String      @unique
   passwordHash String
   name         String?
-  role         String     @default("ADMIN") // ADMIN or CASHIER
-  entrepriseId String
-  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  role         String      @default("ADMIN") // SUPER_ADMIN, ADMIN, CASHIER, DIRECTEUR
+  entrepriseId String?
+  entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   transactions      Transaction[]
   serviceOperations ServiceOperation[]
   sessions          CashRegisterSession[]
+  mainCashSupplies  MainCashSupply[]
 }
 
 model Client {
@@ -109,6 +113,8 @@ model Transaction {
   user         User       @relation(fields: [userId], references: [id])
   clientId     String?
   client       Client?    @relation(fields: [clientId], references: [id])
+  sessionId    String?    // Référence à la session caisse active lors de l'opération
+  session      CashRegisterSession? @relation(fields: [sessionId], references: [id])
 
   fromCurrencyCode String
   toCurrencyCode   String
@@ -132,6 +138,8 @@ model ServiceOperation {
   user         User       @relation(fields: [userId], references: [id])
   clientId     String?
   client       Client?    @relation(fields: [clientId], references: [id])
+  sessionId    String?    // Référence à la session caisse active lors de l'opération
+  session      CashRegisterSession? @relation(fields: [sessionId], references: [id])
 
   // Type principal et sous-type
   // type: MOBILE_MONEY | CREDIT_TRANSFER | FLIGHT_TICKET
@@ -179,7 +187,14 @@ model CashRegisterSession {
   date         DateTime   @default(now())
   status       String     @default("OPEN") // OPEN or CLOSED
   
-  balances     SessionBalance[]
+  balances          SessionBalance[]
+  transactions      Transaction[]
+  serviceOperations ServiceOperation[]
+
+  billBreakdown      String?
+  physicalBalance    Float?
+  theoreticalBalance Float?
+  closingComment     String?   // Commentaire obligatoire si écart ≠ 0
 
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -210,6 +225,9 @@ model DailyReport {
   entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
   
   date         DateTime   @default(now())
+
+  // Utilisateur ayant généré le rapport (caissier ou admin)
+  generatedByUserId String?
   
   // Storing aggregate statistics for history
   totalExchangeIn  Float @default(0)
@@ -224,6 +242,7 @@ model DailyReport {
   reportData   String?
 
   createdAt    DateTime   @default(now())
+
   updatedAt    DateTime   @updatedAt
 }
 
@@ -251,4 +270,18 @@ model Receipt {
   createdAt      DateTime   @default(now())
   
   @@unique([entrepriseId, receiptNumber])
+}
+
+model MainCashSupply {
+  id             String      @id @default(uuid())
+  entrepriseId   String
+  entreprise     Entreprise  @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
+  
+  amount         Float       // Montant débité de la caisse principale
+  targetService  String      // "XOF", "USD", "MM_TMONEY", "CR_MOOV", etc.
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 }

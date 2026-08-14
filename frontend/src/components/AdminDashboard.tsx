@@ -3,7 +3,8 @@ import { api } from '../lib/api';
 import type { DailyReport } from '../lib/api';
 import {
   ArrowUpRight, ArrowDownRight, Wallet, Plane, Phone, Smartphone,
-  TrendingUp, ChevronLeft, ChevronRight, RefreshCw, Calendar, BarChart3
+  TrendingUp, ChevronLeft, ChevronRight, RefreshCw, Calendar, BarChart3,
+  Search, User, FileText
 } from 'lucide-react';
 
 const MONTHS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -24,16 +25,35 @@ const PROVIDER_COLORS: Record<string, string> = {
 
 function fmt(n: number) { return n.toLocaleString('fr-FR'); }
 
+const PAGE_SIZE = 5;
+
 /* ─── Daily Tab ─────────────────────────────────────────────── */
 const DailyTab = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [selected, setSelected] = useState<DailyReport | null>(null);
   const [parsed, setParsed] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+
+  // Pagination & Recherche
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const loadReports = () => {
+    setLoading(true);
+    api.getReports().then(r => {
+      setReports(r);
+      if (r.length > 0 && !selected) {
+        setSelected(r[0]);
+      }
+      setLoading(false);
+    }).catch(e => {
+      console.error(e);
+      setLoading(false);
+    });
+  };
 
   useEffect(() => {
-    api.getReports().then(r => { setReports(r); setLoading(false); }).catch(console.error);
+    loadReports();
   }, []);
 
   useEffect(() => {
@@ -44,42 +64,117 @@ const DailyTab = () => {
     }
   }, [selected]);
 
-  const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      const r = await api.generateReport();
-      setReports([r, ...reports]);
-      setSelected(r);
-    } catch (e) { console.error(e); }
-    finally { setGenerating(false); }
+  const getGeneratorName = (r: DailyReport) => {
+    if (r.generatedByName) return r.generatedByName;
+    if (r.reportData) {
+      try {
+        const p = JSON.parse(r.reportData);
+        if (p?.summary?.generatedBy) return p.summary.generatedBy;
+      } catch {}
+    }
+    return 'Caissier';
   };
 
+  const filteredReports = reports.filter(r => {
+    const generator = getGeneratorName(r).toLowerCase();
+    const dateStr = new Date(r.date).toLocaleDateString('fr-FR').toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return generator.includes(term) || dateStr.includes(term) || r.id.toLowerCase().includes(term);
+  });
+
+  const totalPages = Math.ceil(filteredReports.length / PAGE_SIZE) || 1;
+  const paginatedReports = filteredReports.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   if (loading) return <div className="text-center py-16 text-textMuted">Chargement...</div>;
+
+  const selectedGenerator = selected ? getGeneratorName(selected) : 'Caissier';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* List panel */}
-      <div className="glass-panel p-4 h-fit">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white font-bold">Rapports générés</h3>
-          <button onClick={handleGenerate} disabled={generating}
-            className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5">
-            <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
-            {generating ? '...' : "Générer"}
+      <div className="glass-panel p-4 h-fit space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-bold flex items-center gap-2 text-sm">
+            <FileText className="w-4 h-4 text-primary" /> Rapports de caisse ({filteredReports.length})
+          </h3>
+          <button onClick={loadReports} title="Rafraîchir" className="btn-ghost p-1.5 text-textMuted hover:text-white">
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
-        {reports.length === 0
-          ? <p className="text-textMuted text-sm text-center py-8">Aucun rapport. Cliquez sur Générer.</p>
-          : <div className="space-y-2">
-            {reports.map(r => (
-              <button key={r.id} onClick={() => setSelected(r)}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${selected?.id === r.id ? 'bg-primary/20 border-primary/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
-                <div className="text-white font-medium text-sm">{new Date(r.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                <div className="text-textMuted text-xs mt-0.5">Entrées: {fmt(r.totalExchangeIn)} XOF</div>
-              </button>
-            ))}
+
+        {/* Barre de recherche */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-textMuted" />
+          <input
+            type="text"
+            className="glass-input w-full pl-9 py-1.5 text-xs"
+            placeholder="Filtrer par agent, date..."
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          />
+        </div>
+
+        {filteredReports.length === 0 ? (
+          <p className="text-textMuted text-sm text-center py-8">Aucun rapport trouvé.</p>
+        ) : (
+          <div className="space-y-2">
+            {paginatedReports.map(r => {
+              const generator = getGeneratorName(r);
+              const isSelected = selected?.id === r.id;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setSelected(r)}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${
+                    isSelected ? 'bg-primary/20 border-primary/50' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white font-semibold text-sm">
+                      {new Date(r.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 flex items-center gap-1">
+                      <User className="w-2.5 h-2.5" /> {generator}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-textMuted">
+                    <span>Total Entrées :</span>
+                    <span className="text-emerald-400 font-semibold">{fmt(r.totalExchangeIn)} XOF</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-textMuted mt-0.5">
+                    <span>Mobile Money :</span>
+                    <span className="text-yellow-400">{fmt(r.totalMobileMoneyDeposits ?? 0)} XOF</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        }
+        )}
+
+        {/* Contrôles de pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
+            <span className="text-textMuted">
+              Page {currentPage} / {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="btn-ghost p-1.5 disabled:opacity-30 border border-white/10"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="btn-ghost p-1.5 disabled:opacity-30 border border-white/10"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Detail panel */}
@@ -88,10 +183,21 @@ const DailyTab = () => {
           ? <div className="glass-panel p-8 text-center text-textMuted">Sélectionnez un rapport pour voir les détails</div>
           : <>
             <div className="glass-panel p-6">
-              <h3 className="text-xl font-bold text-white mb-1">
-                {new Date(selected.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              </h3>
-              <p className="text-textMuted text-sm mb-5">Rapport journalier complet</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-white/10">
+                <div>
+                  <h3 className="text-xl font-bold text-white">
+                    {new Date(selected.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </h3>
+                  <p className="text-textMuted text-xs mt-0.5">
+                    Rapport journalier validé
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                  <User className="w-4 h-4 text-primary" />
+                  <span className="text-xs text-textMuted">Généré par :</span>
+                  <strong className="text-xs text-white">{selectedGenerator}</strong>
+                </div>
+              </div>
 
               {/* Summary KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">

@@ -1,28 +1,34 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowRightLeft, Users, Settings, Smartphone, Phone, Plane, FileText, UserCog, UserCircle, ReceiptText, Briefcase } from 'lucide-react';
+import {
+  LayoutDashboard, ArrowRightLeft, Users, Settings, Smartphone, Phone,
+  Plane, FileText, UserCog, UserCircle, ReceiptText, Briefcase, Vault, LogOut,
+  Building2, ShieldAlert
+} from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
-
-
 const navItems = [
-  { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', roles: ['ADMIN', 'CASHIER'] },
+  // Super Admin view
+  { name: 'Gestion Entreprises', icon: Building2, path: '/', roles: ['SUPER_ADMIN'] },
+
+  // Tenant views
+  { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', roles: ['ADMIN', 'CASHIER', 'DIRECTEUR'] },
   { name: 'Transactions', icon: ArrowRightLeft, path: '/transactions', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
   { name: 'Mobile Money', icon: Smartphone, path: '/services/mobile-money', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
   { name: 'Crédit Comm.', icon: Phone, path: '/services/credit', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
   { name: 'Billetterie', icon: Plane, path: '/services/tickets', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
   { name: 'Reçus', icon: ReceiptText, path: '/receipts', roles: ['ADMIN', 'CASHIER'] },
   { name: 'Clients', icon: Users, path: '/clients', roles: ['ADMIN', 'CASHIER'] },
-  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'CASHIER'] },
+  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'DIRECTEUR', 'CASHIER'] },
+  { name: 'Caisse Principale', icon: Vault, path: '/main-cash', roles: ['ADMIN'] },
   { name: 'Équipe', icon: UserCog, path: '/users', roles: ['ADMIN'] },
-  { name: 'Paramètres', icon: Settings, path: '/settings', roles: ['ADMIN', 'CASHIER'] },
+  { name: 'Paramètres', icon: Settings, path: '/settings', roles: ['ADMIN', 'DIRECTEUR'] },
 ];
 
-
 export const Sidebar = () => {
-  const { user, switchRole } = useAuth();
+  const { user, logout } = useAuth();
 
-  const filteredNavItems = navItems.filter(item => item.roles.includes(user.role));
+  if (!user) return null;
 
   return (
     <aside className="w-64 h-screen p-6 border-r border-white/10 glass-panel rounded-none flex flex-col">
@@ -39,9 +45,8 @@ export const Sidebar = () => {
       <nav className="space-y-1 flex-1">
         {(() => {
           const filtered = navItems.filter(item => item.roles.includes(user.role));
-          // Group Services together under a label
           const groups: string[] = [];
-          return filtered.map((item, idx) => {
+          return filtered.map((item) => {
             const isFirstInGroup = (item as any).group && !groups.includes((item as any).group);
             if (isFirstInGroup) groups.push((item as any).group);
             return (
@@ -71,23 +76,25 @@ export const Sidebar = () => {
         })()}
       </nav>
 
-      {/* Mode bascule rôle pour la démo */}
+      {/* User info & Logout */}
       <div className="mt-auto pt-6 border-t border-white/10">
-        <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl">
-          <UserCircle className="w-8 h-8 text-textMuted" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl mb-2">
+          <UserCircle className="w-8 h-8 text-textMuted flex-shrink-0" />
           <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">{user.name}</p>
-            <button 
-              onClick={() => switchRole(user.role === 'ADMIN' ? 'CASHIER' : 'ADMIN')}
-              className="text-xs text-primary hover:text-primary/80 transition-colors"
-            >
-              Mode: {user.role === 'ADMIN' ? 'Administrateur' : 'Caissier'} (Changer)
-            </button>
+            <p className="text-sm font-semibold text-white truncate">{user.name}</p>
+            <p className="text-xs text-textMuted truncate">
+              {user.role === 'SUPER_ADMIN' ? 'Super-Administrateur' : user.role === 'ADMIN' ? 'Administrateur' : user.role === 'DIRECTEUR' ? 'Directeur' : 'Caissier'}
+            </p>
           </div>
         </div>
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-textMuted hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200 text-sm font-medium"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Se déconnecter</span>
+        </button>
       </div>
     </aside>
   );
 };
-
-

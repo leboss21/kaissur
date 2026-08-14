@@ -1,12 +1,22 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('kaissur_token');
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  const mergedHeaders = {
+    ...defaultHeaders,
+    ...(options?.headers as Record<string, string> || {}),
+  };
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      // In future: Authorization: `Bearer ${token}`
-    },
     ...options,
+    headers: mergedHeaders,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -41,6 +51,8 @@ export const api = {
     request<Transaction[]>('/transactions', { headers: { 'Content-Type': 'application/json', 'x-entreprise-id': entrepriseId } }),
   createTransaction: (data: CreateTransactionPayload, entrepriseId: string) =>
     request<Transaction>('/transactions', { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', 'x-entreprise-id': entrepriseId } }),
+  updateTransaction: (id: string, data: Partial<Transaction>, entrepriseId: string) =>
+    request<Transaction>(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', 'x-entreprise-id': entrepriseId } }),
 
   // Cash Register
   getCashRegisters: (entrepriseId: string) =>
@@ -59,12 +71,14 @@ export const api = {
     request<ServiceOperation[]>('/services', { headers: { 'Content-Type': 'application/json', 'x-entreprise-id': entrepriseId } }),
   createServiceOperation: (data: CreateServiceOperationPayload, entrepriseId: string) =>
     request<ServiceOperation>('/services', { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', 'x-entreprise-id': entrepriseId } }),
+  updateServiceOperation: (id: string, data: Partial<ServiceOperation>, entrepriseId: string) =>
+    request<ServiceOperation>(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', 'x-entreprise-id': entrepriseId } }),
 
   // Sessions
-  getCurrentSession: () => request<Session>('/sessions/current'),
+  getCurrentSession: () => request<Session | null>('/sessions/current').catch(() => null),
   openSession: () => request<Session>('/sessions/open', { method: 'POST' }),
-  closeSession: (sessionId: string, declaredBalances: any[]) => 
-    request<Session>(`/sessions/${sessionId}/close`, { method: 'POST', body: JSON.stringify({ declaredBalances }) }),
+  closeSession: (sessionId: string, declaredBalances: any[], billBreakdown?: any, physicalBalance?: number, theoreticalBalance?: number, closingComment?: string) => 
+    request<Session>(`/sessions/${sessionId}/close`, { method: 'POST', body: JSON.stringify({ declaredBalances, billBreakdown, physicalBalance, theoreticalBalance, closingComment }) }),
 
   // Reports
   getReports: () => request<DailyReport[]>('/reports'),
@@ -82,8 +96,71 @@ export const api = {
   // Users
   getUsers: () => request<any[]>('/users'),
   createUser: (data: any) => request<any>('/users', { method: 'POST', body: JSON.stringify(data) }),
-  updateUserRole: (id: string, role: string) => request<any>(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) })
+  updateUserRole: (id: string, role: string) => request<any>(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  updateUser: (id: string, data: any) => request<any>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUser: (id: string) => request<any>(`/users/${id}`, { method: 'DELETE' }),
+
+  // Auth
+  login: (data: any) => request<any>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Caisse Principale
+  getMainCash: () => request<any>('/entreprise/main-cash'),
+  depositMainCash: (amount: number) => request<any>('/entreprise/main-cash/deposit', { method: 'POST', body: JSON.stringify({ amount }) }),
+  supplyCashierService: (data: { amount: number; targetService: string }) => request<any>('/entreprise/main-cash/supply', { method: 'POST', body: JSON.stringify(data) }),
+
+  // SuperAdmin
+  getPlatformStats: () => request<PlatformStats>('/superadmin/stats'),
+  getSuperadminEntreprises: () => request<EntrepriseItem[]>('/superadmin/entreprises'),
+  createSuperadminEntreprise: (data: CreateEntreprisePayload) => request<any>('/superadmin/entreprises', { method: 'POST', body: JSON.stringify(data) }),
+  updateSuperadminEntreprise: (id: string, data: any) => request<any>(`/superadmin/entreprises/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  toggleSuperadminEntrepriseStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED') => request<any>(`/superadmin/entreprises/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  resetSuperadminAdminPassword: (id: string, newPassword: string) => request<any>(`/superadmin/entreprises/${id}/reset-admin`, { method: 'POST', body: JSON.stringify({ newPassword }) })
 };
+
+export interface PlatformStats {
+  totalEntreprises: number;
+  activeEntreprises: number;
+  suspendedEntreprises: number;
+  totalUsers: number;
+  totalOperations: number;
+  totalVolume: number;
+}
+
+export interface EntrepriseItem {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  taxId: string | null;
+  status: 'ACTIVE' | 'SUSPENDED';
+  createdAt: string;
+  updatedAt: string;
+  stats: {
+    totalUsers: number;
+    totalTransactions: number;
+    totalServiceOps: number;
+    totalSessions: number;
+  };
+  primaryAdmin: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    createdAt: string;
+  } | null;
+}
+
+export interface CreateEntreprisePayload {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  taxId?: string;
+  adminName: string;
+  adminEmail: string;
+  adminPassword: string;
+}
 
 // ---------- Types ----------
 export interface Currency {
@@ -125,6 +202,7 @@ export interface Transaction {
   type: string;
   status: string;
   createdAt: string;
+  clientId?: string;
   user?: { name: string; email: string };
   client?: { firstName: string; lastName: string };
   receipt?: any;
@@ -176,6 +254,7 @@ export interface ServiceOperation {
   notes?: string;
   status: string;
   createdAt: string;
+  clientId?: string;
   user?: { name: string; email: string };
   client?: { firstName: string; lastName: string };
   receipt?: any;
@@ -232,5 +311,7 @@ export interface DailyReport {
   totalCredit: number;
   totalTickets: number;
   reportData: string | null;
+  generatedByUserId?: string | null;
+  generatedByName?: string | null;
   createdAt: string;
 }

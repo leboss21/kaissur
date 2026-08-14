@@ -1,15 +1,16 @@
 import { Router } from 'express';
-import { getEntreprise, updateEntreprise } from '../controllers/entreprise.js';
+import { getEntreprise, updateEntreprise, getMainCash, depositMainCash, supplyCashierService } from '../controllers/entreprise.js';
+import { requireTenant } from '../middleware/tenant.js';
 
 const router = Router();
 
-router.use((req, res, next) => {
-  (req as any).entrepriseId = 'demo-tenant';
-  (req as any).userId = 'user-test-id';
-  next();
-});
+router.use(requireTenant);
 
 router.get('/', getEntreprise);
 router.put('/', updateEntreprise);
+
+router.get('/main-cash', getMainCash);
+router.post('/main-cash/deposit', depositMainCash);
+router.post('/main-cash/supply', supplyCashierService);
 
 export default router;

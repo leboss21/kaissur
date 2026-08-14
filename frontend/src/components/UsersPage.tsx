@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldAlert, UserPlus, X } from 'lucide-react';
+import { Shield, ShieldAlert, UserPlus, X, Pencil, KeyRound, Trash2, Briefcase } from 'lucide-react';
 import { api } from '../lib/api';
 
+type ModalMode = 'create' | 'edit' | null;
+
+const EMPTY_CREATE = { name: '', email: '', role: 'CASHIER', password: '' };
+const EMPTY_EDIT   = { name: '', email: '', role: 'CASHIER', password: '' };
+
 export const UsersPage = () => {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'CASHIER', password: '' });
-  const [error, setError] = useState('');
+  const [users, setUsers]           = useState<any[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [modalMode, setModalMode]   = useState<ModalMode>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [form, setForm]             = useState(EMPTY_CREATE);
+  const [error, setError]           = useState('');
+  const [success, setSuccess]       = useState('');
 
   const fetchUsers = () => {
     api.getUsers().then(res => {
@@ -16,17 +23,40 @@ export const UsersPage = () => {
     }).catch(console.error);
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  useEffect(() => { fetchUsers(); }, []);
 
-  const toggleRole = async (id: string, currentRole: string) => {
+  const openCreate = () => {
+    setEditingUser(null);
+    setForm(EMPTY_CREATE);
+    setError('');
+    setSuccess('');
+    setModalMode('create');
+  };
+
+  const openEdit = (u: any) => {
+    setEditingUser(u);
+    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'CASHIER', password: '' });
+    setError('');
+    setSuccess('');
+    setModalMode('edit');
+  };
+
+  const closeModal = () => {
+    setModalMode(null);
+    setEditingUser(null);
+    setError('');
+    setSuccess('');
+  };
+
+  const handleDeleteUser = async (userToDelete: any) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userToDelete.name}" ? Cette action est irréversible.`)) {
+      return;
+    }
     try {
-      const newRole = currentRole === 'ADMIN' ? 'CASHIER' : 'ADMIN';
-      await api.updateUserRole(id, newRole);
+      await api.deleteUser(userToDelete.id);
       fetchUsers();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      alert(err.message || 'Erreur lors de la suppression de l\'utilisateur.');
     }
   };
 
@@ -35,11 +65,36 @@ export const UsersPage = () => {
     setError('');
     try {
       await api.createUser(form);
-      setShowModal(false);
-      setForm({ name: '', email: '', role: 'CASHIER', password: '' });
+      closeModal();
       fetchUsers();
     } catch (err: any) {
       setError(err.message || 'Erreur de création');
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!editingUser) return;
+
+    const payload: any = {};
+    if (form.name && form.name !== editingUser.name)     payload.name  = form.name;
+    if (form.email && form.email !== editingUser.email)  payload.email = form.email;
+    if (form.role && form.role !== editingUser.role)     payload.role  = form.role;
+    if (form.password)                                   payload.password = form.password;
+
+    if (Object.keys(payload).length === 0) {
+      setError('Aucune modification détectée.');
+      return;
+    }
+
+    try {
+      await (api as any).updateUser(editingUser.id, payload);
+      setSuccess('Utilisateur mis à jour avec succès.');
+      fetchUsers();
+      setTimeout(closeModal, 1200);
+    } catch (err: any) {
+      setError(err.message || "Echec de la mise à jour");
     }
   };
 
@@ -48,9 +103,9 @@ export const UsersPage = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-3xl font-bold text-white">Équipe</h2>
-          <p className="text-textMuted mt-1">Gestion des rôles et accès</p>
+          <p className="text-textMuted mt-1">Gestion des utilisateurs et des accès</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <UserPlus className="w-4 h-4" /> Ajouter un utilisateur
         </button>
       </div>
@@ -63,7 +118,7 @@ export const UsersPage = () => {
                 <th className="pb-3 pr-4">Utilisateur</th>
                 <th className="pb-3 pr-4">Email</th>
                 <th className="pb-3 pr-4">Rôle actuel</th>
-                <th className="pb-3">Action</th>
+                <th className="pb-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -76,6 +131,10 @@ export const UsersPage = () => {
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
                         <ShieldAlert className="w-3.5 h-3.5" /> Administrateur
                       </span>
+                    ) : u.role === 'DIRECTEUR' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <Briefcase className="w-3.5 h-3.5" /> Direction
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         <Shield className="w-3.5 h-3.5" /> Caissier
@@ -83,9 +142,25 @@ export const UsersPage = () => {
                     )}
                   </td>
                   <td className="py-4">
-                    <button onClick={() => toggleRole(u.id, u.role)} className="text-xs text-primary hover:underline">
-                      Changer en {u.role === 'ADMIN' ? 'Caissier' : 'Administrateur'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {/* Edit button */}
+                      <button
+                        onClick={() => openEdit(u)}
+                        className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                        title="Modifier les informations"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Modifier
+                      </button>
+
+                      {/* Delete button */}
+                      <button
+                        onClick={() => handleDeleteUser(u)}
+                        className="inline-flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                        title="Supprimer cet utilisateur"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Supprimer
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -99,41 +174,101 @@ export const UsersPage = () => {
         </div>
       </div>
 
-      {showModal && (
+      {/* ── Create / Edit Modal ─────────────────────────────── */}
+      {modalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-textMuted hover:text-white">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-textMuted hover:text-white">
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-xl font-bold text-white mb-6">Nouvel Utilisateur</h3>
-            
-            {error && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">{error}</div>}
 
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="block text-textMuted text-sm mb-1.5">Nom complet</label>
-                <input type="text" required className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-textMuted text-sm mb-1.5">Adresse Email</label>
-                <input type="email" required className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-textMuted text-sm mb-1.5">Mot de passe</label>
-                <input type="password" required className="glass-input w-full" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-textMuted text-sm mb-1.5">Rôle initial</label>
-                <select className="glass-input w-full" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
-                  <option value="CASHIER">Caissier</option>
-                  <option value="ADMIN">Administrateur</option>
-                </select>
-              </div>
-              <button type="submit" className="btn-primary w-full mt-2">Créer l'utilisateur</button>
-            </form>
+            {modalMode === 'create' ? (
+              <>
+                <h3 className="text-xl font-bold text-white mb-6">Nouvel Utilisateur</h3>
+                {error && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">{error}</div>}
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Nom complet</label>
+                    <input type="text" required className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Adresse Email</label>
+                    <input type="email" required className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Mot de passe</label>
+                    <input type="password" required className="glass-input w-full" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Rôle initial</label>
+                    <select className="glass-input w-full" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                      <option value="CASHIER">Caissier</option>
+                      <option value="ADMIN">Administrateur</option>
+                      <option value="DIRECTEUR">Direction / Directeur</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="btn-primary w-full mt-2">Créer l'utilisateur</button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-6">
+                  <Pencil className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-xl font-bold text-white">Modifier – {editingUser?.name}</h3>
+                </div>
+
+                {error   && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">{error}</div>}
+                {success && <div className="mb-4 text-sm text-emerald-400 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">{success}</div>}
+
+                <form onSubmit={handleEditUser} className="space-y-4">
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Nom complet</label>
+                    <input type="text" className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Adresse Email</label>
+                    <input type="email" className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-textMuted text-sm mb-1.5">Rôle</label>
+                    <select className="glass-input w-full" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                      <option value="CASHIER">Caissier</option>
+                      <option value="ADMIN">Administrateur</option>
+                      <option value="DIRECTEUR">Direction / Directeur</option>
+                    </select>
+                  </div>
+
+                  {/* Password reset section */}
+                  <div className="border-t border-white/10 pt-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <KeyRound className="w-4 h-4 text-amber-400" />
+                      <label className="block text-textMuted text-sm">Réinitialiser le mot de passe</label>
+                    </div>
+                    <input
+                      type="password"
+                      placeholder="Laisser vide pour ne pas changer"
+                      className="glass-input w-full"
+                      value={form.password}
+                      onChange={e => setForm({...form, password: e.target.value})}
+                    />
+                    <p className="text-xs text-textMuted mt-1">Laissez vide si vous ne souhaitez pas modifier le mot de passe.</p>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-textMuted hover:text-white hover:border-white/30 transition-all text-sm">
+                      Annuler
+                    </button>
+                    <button type="submit" className="flex-1 btn-primary">
+                      Enregistrer
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 };
+
