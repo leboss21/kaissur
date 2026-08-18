@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle2, Clock, Search, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, CheckCircle2, Clock, Search, Edit2, ChevronLeft, ChevronRight, AlertCircle, ArrowRightLeft } from 'lucide-react';
 import { api } from '../lib/api';
 import type { Transaction, Currency, Client, CreateTransactionPayload } from '../lib/api';
 import { generateReceiptPDF } from '../lib/pdfGenerator';
 import { AmountInput } from './ui/AmountInput';
+import { Combobox } from './ui/Combobox';
 
 const DEMO_ENTREPRISE_ID = 'demo-tenant';
 const PAGE_SIZE = 10;
@@ -24,7 +25,7 @@ export const TransactionsPage = () => {
   // New Transaction Form state
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<CreateTransactionPayload>({
-    fromCurrencyCode: '', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'BUY'
+    fromCurrencyCode: 'XOF', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'BUY'
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -58,10 +59,41 @@ export const TransactionsPage = () => {
   const appliedRate = form.exchangeRate ? form.exchangeRate * (1 + (form.margin || 0) / 100) : 0;
   const amountOut = form.amountIn && appliedRate ? (form.amountIn * appliedRate) : 0;
 
+  // Validation explicite et ciblée
+  const validateTransactionForm = (): string | null => {
+    if (!form.fromCurrencyCode) {
+      return form.type === 'BUY'
+        ? 'Veuillez sélectionner la devise apportée par le client.'
+        : 'Veuillez sélectionner la devise payée par le client.';
+    }
+    if (!form.toCurrencyCode) {
+      return form.type === 'BUY'
+        ? 'Veuillez sélectionner la devise remise au client.'
+        : 'Veuillez sélectionner la devise livrée au client.';
+    }
+    if (form.fromCurrencyCode === form.toCurrencyCode) {
+      return 'La devise d\'entrée et la devise de sortie doivent être différentes.';
+    }
+    if (!form.amountIn || form.amountIn <= 0) {
+      return 'Veuillez saisir un montant apporté supérieur à 0.';
+    }
+    if (!form.exchangeRate || form.exchangeRate <= 0) {
+      return 'Veuillez renseigner un taux de change de base supérieur à 0.';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setError('');
+
+    const validationMsg = validateTransactionForm();
+    if (validationMsg) {
+      setError(validationMsg);
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const payload = { 
         ...form, 
@@ -78,7 +110,7 @@ export const TransactionsPage = () => {
         generateReceiptPDF(receiptData, false);
       }
       
-      setForm({ fromCurrencyCode: '', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'BUY' });
+      setForm({ fromCurrencyCode: 'XOF', toCurrencyCode: '', amountIn: 0, exchangeRate: 0, clientId: '', type: 'BUY' });
       fetchAll();
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la création de la transaction.');
@@ -149,74 +181,94 @@ export const TransactionsPage = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-panel p-8 w-full max-w-lg">
             <h3 className="text-xl font-bold text-white mb-6">Nouvelle transaction d'échange</h3>
-            {error && <div className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-3 mb-4 text-sm">{error}</div>}
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl p-3.5 mb-4 text-sm flex items-center gap-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-textMuted text-sm mb-1.5">Type de transaction *</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setForm({ ...form, type: 'BUY' })}
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      type: 'BUY',
+                      fromCurrencyCode: 'XOF',
+                      toCurrencyCode: f.toCurrencyCode === 'XOF' ? '' : f.toCurrencyCode
+                    }))}
                     className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${
                       form.type === 'BUY'
-                        ? 'bg-emerald-500 text-black border-emerald-500'
+                        ? 'bg-emerald-500 text-black border-emerald-500 shadow-lg shadow-emerald-500/20'
                         : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
                     }`}
                   >
-                    Achat de devise (Le client nous vend)
+                    Achat de devise
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForm({ ...form, type: 'SELL' })}
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      type: 'SELL',
+                      toCurrencyCode: 'XOF',
+                      fromCurrencyCode: f.fromCurrencyCode === 'XOF' ? '' : f.fromCurrencyCode
+                    }))}
                     className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${
                       form.type === 'SELL'
-                        ? 'bg-blue-500 text-white border-blue-500'
+                        ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20'
                         : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
                     }`}
                   >
-                    Vente de devise (Le client nous achète)
+                    Vente de devise
                   </button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-textMuted text-sm mb-1.5">
-                    {form.type === 'BUY' ? 'Devise apportée par le client *' : form.type === 'SELL' ? 'Devise payée par le client *' : 'Devise remise *'}
+                    {form.type === 'BUY' ? 'Devise apportée par le client *' : 'Devise payée par le client *'}
                   </label>
-                  <select 
-                    className="glass-input w-full" 
-                    value={form.fromCurrencyCode} 
-                    onChange={e => {
-                      const code = e.target.value;
+                  <Combobox
+                    options={currencies.map(c => ({
+                      value: c.code,
+                      label: `${c.code} – ${c.name}`,
+                      badge: c.code
+                    }))}
+                    value={form.fromCurrencyCode}
+                    onChange={code => {
                       const selectedCurr = currencies.find(c => c.code === code);
                       const defaultMargin = selectedCurr?.sellMargin || exchangeMargin;
-                      setForm({ ...form, fromCurrencyCode: code, margin: defaultMargin });
-                    }} 
-                    required
-                  >
-                    <option value="">Sélectionner...</option>
-                    {currencies.map(c => <option key={c.code} value={c.code}>{c.code} – {c.name}</option>)}
-                  </select>
+                      setForm(f => ({ ...f, fromCurrencyCode: code, margin: defaultMargin }));
+                    }}
+                    placeholder="Sélectionner la devise..."
+                    searchPlaceholder="Rechercher code ou nom (USD, EUR, XOF)..."
+                  />
                 </div>
                 <div>
                   <label className="block text-textMuted text-sm mb-1.5">
-                    {form.type === 'BUY' ? 'Devise donnée au client *' : form.type === 'SELL' ? 'Devise livrée au client *' : 'Devise reçue *'}
+                    {form.type === 'BUY' ? 'Devise donnée au client *' : 'Devise livrée au client *'}
                   </label>
-                  <select 
-                    className="glass-input w-full" 
-                    value={form.toCurrencyCode} 
-                    onChange={e => setForm({ ...form, toCurrencyCode: e.target.value })} 
-                    required
-                  >
-                    <option value="">Sélectionner...</option>
-                    {currencies.filter(c => c.code !== form.fromCurrencyCode).map(c => <option key={c.code} value={c.code}>{c.code} – {c.name}</option>)}
-                  </select>
+                  <Combobox
+                    options={currencies
+                      .filter(c => c.code !== form.fromCurrencyCode)
+                      .map(c => ({
+                        value: c.code,
+                        label: `${c.code} – ${c.name}`,
+                        badge: c.code
+                      }))}
+                    value={form.toCurrencyCode}
+                    onChange={code => setForm(f => ({ ...f, toCurrencyCode: code }))}
+                    placeholder="Sélectionner la devise..."
+                    searchPlaceholder="Rechercher code ou nom (USD, EUR, XOF)..."
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-textMuted text-sm mb-1.5">
-                    {form.type === 'BUY' ? 'Montant apporté par le client *' : form.type === 'SELL' ? 'Montant payé par le client *' : 'Montant remis *'}
+                    {form.type === 'BUY' ? 'Montant apporté par le client *' : 'Montant payé par le client *'}
                   </label>
                   <AmountInput 
                     value={form.amountIn || 0} 
@@ -247,7 +299,7 @@ export const TransactionsPage = () => {
                 </div>
                 <div>
                   <label className="block text-textMuted text-sm mb-1.5">Taux appliqué au client</label>
-                  <div className="glass-input w-full bg-white/5 flex items-center text-white/50">{appliedRate.toFixed(4)}</div>
+                  <div className="glass-input w-full bg-white/5 flex items-center text-white font-mono">{appliedRate.toFixed(4)}</div>
                 </div>
               </div>
 
@@ -255,16 +307,26 @@ export const TransactionsPage = () => {
               {amountOut > 0 && (
                 <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex items-center justify-between">
                   <span className="text-textMuted text-sm">Le client recevra au total</span>
-                  <span className="text-accent font-bold text-lg">{amountOut.toFixed(2)} {form.toCurrencyCode}</span>
+                  <span className="text-accent font-bold text-lg font-mono">{amountOut.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {form.toCurrencyCode}</span>
                 </div>
               )}
 
               <div>
                 <label className="block text-textMuted text-sm mb-1.5">Client (optionnel)</label>
-                <select className="glass-input w-full" value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>
-                  <option value="">Anonyme (passage)</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}
-                </select>
+                <Combobox
+                  options={[
+                    { value: '', label: 'Client Anonyme (au comptoir)' },
+                    ...clients.map(c => ({
+                      value: c.id,
+                      label: `${c.firstName} ${c.lastName}`,
+                      subLabel: c.phone || undefined
+                    }))
+                  ]}
+                  value={form.clientId || ''}
+                  onChange={val => setForm({ ...form, clientId: val })}
+                  placeholder="Sélectionner ou rechercher un client..."
+                  searchPlaceholder="Rechercher un client..."
+                />
               </div>
 
               <div className="flex gap-3 pt-2">

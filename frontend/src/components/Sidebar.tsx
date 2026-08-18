@@ -12,15 +12,15 @@ const navItems = [
   { name: 'Gestion Entreprises', icon: Building2, path: '/', roles: ['SUPER_ADMIN'] },
 
   // Tenant views
-  { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', roles: ['ADMIN', 'CASHIER', 'DIRECTEUR'] },
-  { name: 'Transactions', icon: ArrowRightLeft, path: '/transactions', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
-  { name: 'Mobile Money', icon: Smartphone, path: '/services/mobile-money', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
-  { name: 'Crédit Comm.', icon: Phone, path: '/services/credit', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
-  { name: 'Billetterie', icon: Plane, path: '/services/tickets', roles: ['ADMIN', 'CASHIER'], group: 'Services' },
-  { name: 'Reçus', icon: ReceiptText, path: '/receipts', roles: ['ADMIN', 'CASHIER'] },
-  { name: 'Clients', icon: Users, path: '/clients', roles: ['ADMIN', 'CASHIER'] },
-  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'DIRECTEUR', 'CASHIER'] },
-  { name: 'Caisse Principale', icon: Vault, path: '/main-cash', roles: ['ADMIN'] },
+  { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'DIRECTEUR'] },
+  { name: 'Caisse Principale', icon: Vault, path: '/main-cash', roles: ['CHEF_CAISSE'] },
+  { name: 'Transactions', icon: ArrowRightLeft, path: '/transactions', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
+  { name: 'Mobile Money', icon: Smartphone, path: '/services/mobile-money', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
+  { name: 'Crédit Comm.', icon: Phone, path: '/services/credit', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
+  { name: 'Billetterie', icon: Plane, path: '/services/tickets', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
+  { name: 'Reçus', icon: ReceiptText, path: '/receipts', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'] },
+  { name: 'Clients', icon: Users, path: '/clients', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'] },
+  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'DIRECTEUR', 'CHEF_CAISSE', 'CASHIER'] },
   { name: 'Équipe', icon: UserCog, path: '/users', roles: ['ADMIN'] },
   { name: 'Paramètres', icon: Settings, path: '/settings', roles: ['ADMIN', 'DIRECTEUR'] },
 ];
@@ -83,7 +83,7 @@ export const Sidebar = () => {
           <div className="flex-1 overflow-hidden">
             <p className="text-sm font-semibold text-white truncate">{user.name}</p>
             <p className="text-xs text-textMuted truncate">
-              {user.role === 'SUPER_ADMIN' ? 'Super-Administrateur' : user.role === 'ADMIN' ? 'Administrateur' : user.role === 'DIRECTEUR' ? 'Directeur' : 'Caissier'}
+              {user.role === 'SUPER_ADMIN' ? 'Super-Administrateur' : user.role === 'ADMIN' ? 'Administrateur' : user.role === 'CHEF_CAISSE' ? 'Chef Caisse' : user.role === 'DIRECTEUR' ? 'Directeur' : 'Caissier'}
             </p>
           </div>
         </div>

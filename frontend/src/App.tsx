@@ -23,6 +23,7 @@ function MainLayout() {
 
   const isSuperAdmin = user.role === 'SUPER_ADMIN';
   const isAdmin = user.role === 'ADMIN';
+  const isChefCaisse = user.role === 'CHEF_CAISSE';
   const isDirecteur = user.role === 'DIRECTEUR';
   const isCashier = user.role === 'CASHIER';
 
@@ -51,7 +52,7 @@ function MainLayout() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
 
-            {/* Operational routes — ADMIN and CASHIER only, not DIRECTEUR */}
+            {/* Operational routes — ADMIN, CHEF_CAISSE and CASHIER, not DIRECTEUR */}
             <Route path="/transactions" element={isDirecteur ? <Navigate to="/" replace /> : <TransactionsPage />} />
             <Route path="/clients" element={isDirecteur ? <Navigate to="/" replace /> : <ClientsPage />} />
             <Route path="/services/mobile-money" element={isDirecteur ? <Navigate to="/" replace /> : <ServicesPage defaultTab="MOBILE_MONEY" />} />
@@ -59,16 +60,16 @@ function MainLayout() {
             <Route path="/services/tickets" element={isDirecteur ? <Navigate to="/" replace /> : <ServicesPage defaultTab="TICKET" />} />
             <Route path="/services" element={isDirecteur ? <Navigate to="/" replace /> : <ServicesPage defaultTab="MOBILE_MONEY" />} />
             <Route path="/receipts" element={isDirecteur ? <Navigate to="/" replace /> : <ReceiptsPage />} />
-            <Route path="/settings" element={isCashier ? <Navigate to="/" replace /> : <SettingsPage />} />
+            <Route path="/settings" element={isCashier || isChefCaisse ? <Navigate to="/" replace /> : <SettingsPage />} />
 
-            {/* Reports — ADMIN, DIRECTEUR and CASHIER */}
+            {/* Reports — ADMIN, DIRECTEUR, CHEF_CAISSE and CASHIER */}
             <Route path="/reports" element={<ReportsPage />} />
 
             {/* Users — ADMIN only */}
             <Route path="/users" element={!isAdmin ? <Navigate to="/" replace /> : <UsersPage />} />
 
-            {/* Main cash — ADMIN only */}
-            {isAdmin && <Route path="/main-cash" element={<MainCashPage />} />}
+            {/* Main cash — CHEF_CAISSE only (or fallback if direct URL) */}
+            <Route path="/main-cash" element={!isChefCaisse && !isAdmin ? <Navigate to="/" replace /> : <MainCashPage />} />
 
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />

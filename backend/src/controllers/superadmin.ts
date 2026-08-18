@@ -162,6 +162,29 @@ export const createEntreprise = async (req: Request, res: Response) => {
       }
     });
 
+    // Création des 4 prestataires par défaut (2 Mobile Money + 2 Crédit de communication)
+    try {
+      const defaultProviders = [
+        { type: 'MOBILE_MONEY', name: 'MIXX BY YAS', color: '#dcf901' },
+        { type: 'MOBILE_MONEY', name: 'MOOV MONEY', color: '#1115e4' },
+        { type: 'CREDIT', name: 'MIXX', color: '#fbea32' },
+        { type: 'CREDIT', name: 'MOOV', color: '#060ef4' },
+      ];
+
+      for (const p of defaultProviders) {
+        await prisma.serviceProvider.create({
+          data: {
+            entrepriseId: newEntreprise.id,
+            type: p.type,
+            name: p.name,
+            color: p.color
+          }
+        });
+      }
+    } catch (pErr) {
+      console.error('Warning: failed to seed default providers for new enterprise:', pErr);
+    }
+
     res.status(201).json({
       message: 'Entreprise et compte administrateur créés avec succès.',
       entreprise: newEntreprise

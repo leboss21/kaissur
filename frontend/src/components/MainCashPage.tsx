@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Vault, PlusCircle, ArrowDownToLine, History, AlertCircle, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { AmountInput } from './ui/AmountInput';
 
 const SERVICE_OPTIONS = [
   { value: 'XOF', label: 'Caisse XOF (espèces)' },
@@ -23,11 +24,11 @@ export const MainCashPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
 
   // Deposit form
-  const [depositAmount, setDepositAmount] = useState('');
+  const [depositAmount, setDepositAmount] = useState<number>(0);
   const [depositLoading, setDepositLoading] = useState(false);
 
   // Supply form
-  const [supplyAmount, setSupplyAmount] = useState('');
+  const [supplyAmount, setSupplyAmount] = useState<number>(0);
   const [supplyService, setSupplyService] = useState('XOF');
   const [supplyLoading, setSupplyLoading] = useState(false);
 
@@ -53,11 +54,15 @@ export const MainCashPage = () => {
 
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!depositAmount || depositAmount <= 0) {
+      setError('Veuillez saisir un montant de dépôt supérieur à 0.');
+      return;
+    }
     setDepositLoading(true);
     setError('');
     try {
-      await api.depositMainCash(parseFloat(depositAmount));
-      setDepositAmount('');
+      await api.depositMainCash(depositAmount);
+      setDepositAmount(0);
       showSuccess('Dépôt enregistré avec succès.');
       load();
     } catch (e: any) {
@@ -69,12 +74,16 @@ export const MainCashPage = () => {
 
   const handleSupply = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supplyAmount || supplyAmount <= 0) {
+      setError("Veuillez saisir un montant d'approvisionnement supérieur à 0.");
+      return;
+    }
     setSupplyLoading(true);
     setError('');
     try {
-      await api.supplyCashierService({ amount: parseFloat(supplyAmount), targetService: supplyService });
-      setSupplyAmount('');
-      showSuccess(`Approvisionnement ${supplyService} effectué.`);
+      await api.supplyCashierService({ amount: supplyAmount, targetService: supplyService });
+      setSupplyAmount(0);
+      showSuccess(`Approvisionnement ${supplyService} effectué avec succès.`);
       load();
     } catch (e: any) {
       setError(e.message);
@@ -145,15 +154,11 @@ export const MainCashPage = () => {
           <form onSubmit={handleDeposit} className="space-y-4">
             <div>
               <label className="block text-textMuted text-xs uppercase tracking-wider mb-2">Montant (FCFA)</label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                required
-                className="glass-input w-full"
-                placeholder="0"
+              <AmountInput
                 value={depositAmount}
-                onChange={e => setDepositAmount(e.target.value)}
+                onChangeAmount={val => setDepositAmount(val)}
+                placeholder="0"
+                className="glass-input w-full font-mono text-base text-white"
               />
             </div>
             <button type="submit" disabled={depositLoading} className="btn-primary w-full flex items-center justify-center gap-2">
@@ -173,7 +178,7 @@ export const MainCashPage = () => {
             <div>
               <label className="block text-textMuted text-xs uppercase tracking-wider mb-2">Service cible</label>
               <select
-                className="glass-input w-full"
+                className="glass-input w-full bg-slate-900"
                 value={supplyService}
                 onChange={e => setSupplyService(e.target.value)}
               >
@@ -184,15 +189,11 @@ export const MainCashPage = () => {
             </div>
             <div>
               <label className="block text-textMuted text-xs uppercase tracking-wider mb-2">Montant (FCFA)</label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                required
-                className="glass-input w-full"
-                placeholder="0"
+              <AmountInput
                 value={supplyAmount}
-                onChange={e => setSupplyAmount(e.target.value)}
+                onChangeAmount={val => setSupplyAmount(val)}
+                placeholder="0"
+                className="glass-input w-full font-mono text-base text-white"
               />
             </div>
             <button type="submit" disabled={supplyLoading} className="btn-primary w-full flex items-center justify-center gap-2">

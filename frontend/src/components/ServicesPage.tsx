@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Plane, Plus, Phone, Search, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Smartphone, Plane, Plus, Phone, Search, Edit2, ChevronLeft, ChevronRight, AlertCircle, Building, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { generateReceiptPDF } from '../lib/pdfGenerator';
 import { AmountInput } from './ui/AmountInput';
 import { PhoneInput } from './ui/PhoneInput';
+import { Combobox } from './ui/Combobox';
+import { WORLD_CITIES } from '../lib/cities';
 import type { ServiceOperation, Client, CreateServiceOperationPayload, ServiceProvider } from '../lib/api';
 
 const DEMO_ENTREPRISE_ID = 'demo-tenant';
@@ -16,6 +18,19 @@ const TAB_CONFIG: Record<TabType, { label: string; icon: React.ElementType; colo
   CREDIT: { label: 'Crédit de Communication', icon: Phone, color: 'text-blue-400' },
   TICKET: { label: 'Billetterie', icon: Plane, color: 'text-purple-400' },
 };
+
+const AIRLINE_OPTIONS = [
+  { value: 'ASKY', label: 'Asky Airlines', badge: 'KP' },
+  { value: 'AIR_FRANCE', label: 'Air France', badge: 'AF' },
+  { value: 'ETHIOPIAN', label: 'Ethiopian Airlines', badge: 'ET' },
+  { value: 'AIR_COTE_D_IVOIRE', label: 'Air Côte d\'Ivoire', badge: 'HF' },
+  { value: 'ROYAL_AIR_MAROC', label: 'Royal Air Maroc', badge: 'AT' },
+  { value: 'BRUSSELS_AIRLINES', label: 'Brussels Airlines', badge: 'SN' },
+  { value: 'EMIRATES', label: 'Emirates', badge: 'EK' },
+  { value: 'TURKISH_AIRLINES', label: 'Turkish Airlines', badge: 'TK' },
+  { value: 'CORSAIR', label: 'Corsair', badge: 'SS' },
+  { value: 'OTHER', label: 'Autre Compagnie', badge: 'AUTRE' },
+];
 
 export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: TabType }) => {
   const [operations, setOperations] = useState<ServiceOperation[]>([]);
@@ -70,13 +85,78 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
   const openForm = (tab: TabType) => {
     setActiveTab(tab);
     setForm({ type: tab });
+    setError('');
     setShowForm(true);
+  };
+
+  // Validation explicite et détaillée par champ
+  const validateForm = (): string | null => {
+    if (activeTab === 'MOBILE_MONEY') {
+      if (!form.provider) {
+        return 'Veuillez sélectionner un opérateur Mobile Money (ex: Flooz, T-Money, Mixx...).';
+      }
+      if (!form.subType) {
+        return "Veuillez sélectionner le type d'opération (Dépôt ou Retrait).";
+      }
+      if (!form.phone || form.phone.trim().length < 6) {
+        return 'Veuillez renseigner un numéro de téléphone valide pour la transaction.';
+      }
+      if (!form.amount || form.amount <= 0) {
+        return "Veuillez saisir un montant d'opération supérieur à 0 FCFA.";
+      }
+    } else if (activeTab === 'CREDIT') {
+      if (!form.provider) {
+        return 'Veuillez sélectionner un opérateur de crédit (ex: Moov, Togocel, Mixx...).';
+      }
+      if (!form.phone || form.phone.trim().length < 6) {
+        return 'Veuillez renseigner le numéro de téléphone à recharger.';
+      }
+      if (!form.amount || form.amount <= 0) {
+        return 'Veuillez saisir un montant de recharge supérieur à 0 FCFA.';
+      }
+    } else if (activeTab === 'TICKET') {
+      if (!form.airline) {
+        return 'Veuillez sélectionner la compagnie aérienne.';
+      }
+      if (!form.passengerName || !form.passengerName.trim()) {
+        return 'Veuillez indiquer le nom et prénom du passager.';
+      }
+      if (!form.departure || !form.departure.trim()) {
+        return 'Veuillez renseigner la ville ou l\'aéroport de départ.';
+      }
+      if (!form.destination || !form.destination.trim()) {
+        return 'Veuillez renseigner la ville ou l\'aéroport d\'arrivée (destination).';
+      }
+      if (form.departure.trim().toLowerCase() === form.destination.trim().toLowerCase()) {
+        return 'La ville de départ et la ville de destination doivent être différentes.';
+      }
+      if (!form.flightDate) {
+        return 'Veuillez sélectionner la date du vol.';
+      }
+      if (!form.ticketPrice || form.ticketPrice <= 0) {
+        return 'Veuillez renseigner le coût d\'achat partenaire (prix du billet) supérieur à 0.';
+      }
+      if (!form.amount || form.amount <= 0) {
+        return 'Veuillez renseigner le prix de vente facturé au client.';
+      }
+      if (form.amount < form.ticketPrice) {
+        return 'Le prix de vente au client ne peut pas être inférieur au coût d\'achat du billet.';
+      }
+    }
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setError('');
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setSubmitting(true);
     try {
       let finalForm = { ...form, type: activeTab, clientId: form.clientId || undefined };
       
@@ -99,7 +179,7 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
         generateReceiptPDF(receiptData, false);
       }
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de l\'enregistrement');
+      setError(err.message || 'Erreur lors de l\'enregistrement de l\'opération.');
     } finally {
       setSubmitting(false);
     }
@@ -183,6 +263,11 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
 
   const renderFormContent = () => {
     if (activeTab === 'MOBILE_MONEY') {
+      const subTypeOptions = [
+        { value: 'DEPOSIT', label: 'Dépôt d\'argent', badge: 'DÉPÔT' },
+        { value: 'WITHDRAWAL', label: 'Retrait d\'argent', badge: 'RETRAIT' },
+      ];
+
       return (
         <>
           <div className="grid grid-cols-2 gap-4">
@@ -194,11 +279,13 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
             </div>
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Type d'opération *</label>
-              <select className="glass-input w-full" value={form.subType || ''} onChange={e => setForm({ ...form, subType: e.target.value })} required>
-                <option value="">Sélectionner...</option>
-                <option value="DEPOSIT">Dépôt</option>
-                <option value="WITHDRAWAL">Retrait</option>
-              </select>
+              <Combobox
+                options={subTypeOptions}
+                value={form.subType || ''}
+                onChange={val => setForm({ ...form, subType: val })}
+                placeholder="Sélectionner le type..."
+                searchPlaceholder="Dépôt, Retrait..."
+              />
             </div>
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Numéro de téléphone *</label>
@@ -250,43 +337,40 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Compagnie Aérienne *</label>
-              <select className="glass-input w-full" value={form.airline || ''} onChange={e => setForm({ ...form, airline: e.target.value })} required>
-                <option value="">Sélectionner...</option>
-                <option value="ASKY">Asky Airlines</option>
-                <option value="AIR_FRANCE">Air France</option>
-                <option value="ETHIOPIAN">Ethiopian Airlines</option>
-                <option value="AIR_COTE_D_IVOIRE">Air Côte d'Ivoire</option>
-                <option value="ROYAL_AIR_MAROC">Royal Air Maroc</option>
-                <option value="BRUSSELS_AIRLINES">Brussels Airlines</option>
-                <option value="OTHER">Autre</option>
-              </select>
+              <Combobox
+                options={AIRLINE_OPTIONS}
+                value={form.airline || ''}
+                onChange={val => setForm({ ...form, airline: val })}
+                placeholder="Sélectionner une compagnie..."
+                searchPlaceholder="Rechercher une compagnie..."
+              />
             </div>
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Nom du passager *</label>
-              <input className="glass-input w-full" type="text" placeholder="John Doe" value={form.passengerName || ''} onChange={e => setForm({ ...form, passengerName: e.target.value })} required />
+              <input className="glass-input w-full" type="text" placeholder="Ex: Jean Dupont" value={form.passengerName || ''} onChange={e => setForm({ ...form, passengerName: e.target.value })} required />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Départ (Ville / Aéroport) *</label>
-              <input
-                className="glass-input w-full uppercase"
-                type="text"
-                placeholder="ex: LFW - Lomé"
-                value={form.departure || 'LFW - Lomé'}
-                onChange={e => setForm({ ...form, departure: e.target.value })}
-                required
+              <Combobox
+                options={WORLD_CITIES}
+                value={form.departure || 'Lomé (LFW)'}
+                onChange={val => setForm({ ...form, departure: val })}
+                placeholder="Ville ou aéroport de départ..."
+                searchPlaceholder="Rechercher une ville, code IATA (ex: LFW, Paris)..."
+                allowCustom={true}
               />
             </div>
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Destination (Ville / Aéroport) *</label>
-              <input
-                className="glass-input w-full uppercase"
-                type="text"
-                placeholder="ex: CDG - Paris"
+              <Combobox
+                options={WORLD_CITIES}
                 value={form.destination || ''}
-                onChange={e => setForm({ ...form, destination: e.target.value })}
-                required
+                onChange={val => setForm({ ...form, destination: val })}
+                placeholder="Ville ou aéroport d'arrivée..."
+                searchPlaceholder="Rechercher une ville, code IATA (ex: CDG, Abidjan)..."
+                allowCustom={true}
               />
             </div>
           </div>
@@ -297,7 +381,7 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
             </div>
             <div>
               <label className="block text-textMuted text-sm mb-1.5">Numéro de vol</label>
-              <input className="glass-input w-full" type="text" placeholder="AF123" value={form.flightNumber || ''} onChange={e => setForm({ ...form, flightNumber: e.target.value })} />
+              <input className="glass-input w-full" type="text" placeholder="Ex: KP024 / AF338" value={form.flightNumber || ''} onChange={e => setForm({ ...form, flightNumber: e.target.value })} />
             </div>
           </div>
 
@@ -353,6 +437,15 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
   const totalPages = Math.ceil(filteredOperations.length / PAGE_SIZE) || 1;
   const paginatedOperations = filteredOperations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+  const clientOptions = [
+    { value: '', label: 'Client Anonyme / Au comptoir' },
+    ...clients.map(c => ({
+      value: c.id,
+      label: `${c.firstName} ${c.lastName}`,
+      subLabel: c.phone || undefined
+    }))
+  ];
+
   return (
     <div className="p-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-8">
@@ -374,25 +467,33 @@ export const ServicesPage = ({ defaultTab = 'MOBILE_MONEY' }: { defaultTab?: Tab
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-panel p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-white mb-6">
-              {activeTab === 'MOBILE_MONEY' ? 'Nouvelle opération Mobile Money' : activeTab === 'CREDIT' ? 'Vente de crédit' : 'Réservation de billet'}
+              {activeTab === 'MOBILE_MONEY' ? 'Nouvelle opération Mobile Money' : activeTab === 'CREDIT' ? 'Vente de crédit' : 'Réservation de billet d\'avion'}
             </h3>
-            {error && <div className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-3 mb-4 text-sm">{error}</div>}
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl p-3.5 mb-4 text-sm flex items-center gap-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
               {renderFormContent()}
               
               <div>
                 <label className="block text-textMuted text-sm mb-1.5">Client (optionnel)</label>
-                <select className="glass-input w-full" value={form.clientId || ''} onChange={e => setForm({ ...form, clientId: e.target.value })}>
-                  <option value="">Anonyme</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}
-                </select>
+                <Combobox
+                  options={clientOptions}
+                  value={form.clientId || ''}
+                  onChange={val => setForm({ ...form, clientId: val })}
+                  placeholder="Sélectionner ou rechercher un client..."
+                  searchPlaceholder="Rechercher par nom..."
+                />
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button type="button" className="btn-ghost flex-1" onClick={() => setShowForm(false)}>Annuler</button>
                 <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-                  {submitting ? 'Traitement...' : 'Enregistrer'}
+                  {submitting ? 'Traitement...' : 'Enregistrer l\'opération'}
                 </button>
               </div>
             </form>

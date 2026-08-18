@@ -61,10 +61,10 @@ export const generateDailyReport = async (req: Request, res: Response) => {
 
     if (!entrepriseId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Restriction stricte : Seul le rôle Caissier peut générer un rapport de caisse
-    if (userRole !== 'CASHIER') {
+    // Restriction : Seuls les rôles Caissier et Chef Caisse peuvent générer un rapport de caisse
+    if (userRole !== 'CASHIER' && userRole !== 'CHEF_CAISSE') {
       return res.status(403).json({
-        error: "Seul un utilisateur avec le rôle Caissier peut générer un rapport journalier de caisse."
+        error: "Seul un utilisateur avec le rôle Caissier ou Chef Caisse peut générer un rapport journalier de caisse."
       });
     }
 

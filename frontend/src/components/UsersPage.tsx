@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldAlert, UserPlus, X, Pencil, KeyRound, Trash2, Briefcase } from 'lucide-react';
+import { Shield, ShieldAlert, UserPlus, X, Pencil, KeyRound, Trash2, Briefcase, Vault } from 'lucide-react';
 import { api } from '../lib/api';
 
 type ModalMode = 'create' | 'edit' | null;
@@ -131,6 +131,10 @@ export const UsersPage = () => {
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
                         <ShieldAlert className="w-3.5 h-3.5" /> Administrateur
                       </span>
+                    ) : u.role === 'CHEF_CAISSE' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <Vault className="w-3.5 h-3.5" /> Chef Caisse
+                      </span>
                     ) : u.role === 'DIRECTEUR' ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
                         <Briefcase className="w-3.5 h-3.5" /> Direction
@@ -143,7 +147,6 @@ export const UsersPage = () => {
                   </td>
                   <td className="py-4">
                     <div className="flex items-center gap-3">
-                      {/* Edit button */}
                       <button
                         onClick={() => openEdit(u)}
                         className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
@@ -152,7 +155,6 @@ export const UsersPage = () => {
                         <Pencil className="w-3.5 h-3.5" /> Modifier
                       </button>
 
-                      {/* Delete button */}
                       <button
                         onClick={() => handleDeleteUser(u)}
                         className="inline-flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 transition-colors"
@@ -178,31 +180,38 @@ export const UsersPage = () => {
       {modalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
-            <button onClick={closeModal} className="absolute top-4 right-4 text-textMuted hover:text-white">
+            <button
+              onClick={() => setModalMode(null)}
+              className="absolute top-4 right-4 text-textMuted hover:text-white transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
 
             {modalMode === 'create' ? (
               <>
-                <h3 className="text-xl font-bold text-white mb-6">Nouvel Utilisateur</h3>
+                <div className="flex items-center gap-2 mb-6">
+                  <UserPlus className="w-5 h-5 text-primary" />
+                  <h3 className="text-xl font-bold text-white">Ajouter un utilisateur</h3>
+                </div>
                 {error && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">{error}</div>}
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div>
                     <label className="block text-textMuted text-sm mb-1.5">Nom complet</label>
-                    <input type="text" required className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                    <input type="text" required placeholder="Ex: Jean Dupont" className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
                   </div>
                   <div>
                     <label className="block text-textMuted text-sm mb-1.5">Adresse Email</label>
-                    <input type="email" required className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                    <input type="email" required placeholder="jean@example.com" className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-textMuted text-sm mb-1.5">Mot de passe</label>
+                    <label className="block text-textMuted text-sm mb-1.5">Mot de passe provisoire</label>
                     <input type="password" required className="glass-input w-full" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
                   </div>
                   <div>
                     <label className="block text-textMuted text-sm mb-1.5">Rôle initial</label>
-                    <select className="glass-input w-full" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                    <select className="glass-input w-full bg-slate-900" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
                       <option value="CASHIER">Caissier</option>
+                      <option value="CHEF_CAISSE">Chef Caisse</option>
                       <option value="ADMIN">Administrateur</option>
                       <option value="DIRECTEUR">Direction / Directeur</option>
                     </select>
@@ -231,14 +240,14 @@ export const UsersPage = () => {
                   </div>
                   <div>
                     <label className="block text-textMuted text-sm mb-1.5">Rôle</label>
-                    <select className="glass-input w-full" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                    <select className="glass-input w-full bg-slate-900" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
                       <option value="CASHIER">Caissier</option>
+                      <option value="CHEF_CAISSE">Chef Caisse</option>
                       <option value="ADMIN">Administrateur</option>
                       <option value="DIRECTEUR">Direction / Directeur</option>
                     </select>
                   </div>
 
-                  {/* Password reset section */}
                   <div className="border-t border-white/10 pt-4">
                     <div className="flex items-center gap-2 mb-2">
                       <KeyRound className="w-4 h-4 text-amber-400" />

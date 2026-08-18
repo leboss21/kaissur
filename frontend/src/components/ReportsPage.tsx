@@ -87,63 +87,140 @@ export const ReportsPage = () => {
     const parsed = parseReportData(r);
     const generator = getGeneratorName(r);
     const wb = utils.book_new();
+    const dateFormatted = new Date(r.date).toLocaleDateString('fr-FR');
+    const genDateFormatted = new Date(r.createdAt).toLocaleString('fr-FR');
 
-    // Feuille 1: Résumé Global
-    const summaryData = [
-      ['RAPPORT JOURNALIER DU', new Date(r.date).toLocaleDateString('fr-FR')],
-      ['GÉNÉRÉ PAR', generator],
-      ['DATE DE GÉNÉRATION', new Date(r.createdAt).toLocaleString('fr-FR')],
+    // Feuille 1: Rapport Global (Miroir PDF)
+    const reportAoa: any[][] = [
+      ['EXCHANGE OS — RAPPORT FINANCIER JOURNALIER'],
+      ['Date du rapport :', dateFormatted],
+      ['Généré par :', generator],
+      ['Date de génération :', genDateFormatted],
       [''],
-      ['KPI / Métrique', 'Valeur (XOF)'],
-      ['Entrées Change', r.totalExchangeIn],
-      ['Sorties Change', r.totalExchangeOut],
-      ['Mobile Money (Dépôts)', r.totalMobileMoneyDeposits ?? 0],
-      ['Mobile Money (Retraits)', r.totalMobileMoneyWithdrawals ?? 0],
+      ['1. SYNTHÈSE GLOBALE DES OPÉRATIONS'],
+      ['Métrique', 'Montant (XOF)'],
+      ['Entrées Change (Achats)', r.totalExchangeIn],
+      ['Sorties Change (Ventes)', r.totalExchangeOut],
+      ['Mobile Money — Dépôts', r.totalMobileMoneyDeposits ?? 0],
+      ['Mobile Money — Retraits', r.totalMobileMoneyWithdrawals ?? 0],
       ['Crédit de Communication', r.totalCredit],
-      ['Billetterie (Ventes)', r.totalTickets],
+      ['Billetterie — Ventes de billets', r.totalTickets],
     ];
+
     if (parsed?.summary?.totalFeesCollected) {
-      summaryData.push(['Frais Collectés', parsed.summary.totalFeesCollected]);
+      reportAoa.push(['Frais Collectés (Services)', parsed.summary.totalFeesCollected]);
     }
     if (parsed?.summary?.totalCommissionTickets) {
-      summaryData.push(['Commissions Billets', parsed.summary.totalCommissionTickets]);
+      reportAoa.push(['Commissions / Marges Billetterie', parsed.summary.totalCommissionTickets]);
     }
-    const wsSummary = utils.aoa_to_sheet(summaryData);
-    utils.book_append_sheet(wb, wsSummary, "Résumé");
 
-    // Feuille 2: Mobile Money par Opérateur
+    // Section 2: Mobile Money
+    if (parsed?.breakdown?.mobileMoneyByProvider && Object.keys(parsed.breakdown.mobileMoneyByProvider).length > 0) {
+      reportAoa.push(['']);
+      reportAoa.push(['2. VENTILATION MOBILE MONEY PAR OPÉRATEUR']);
+      reportAoa.push(['Opérateur', 'Dépôts (XOF)', 'Retraits (XOF)', 'Total Net (XOF)', 'Nb Opérations']);
+      Object.entries(parsed.breakdown.mobileMoneyByProvider).forEach(([prov, item]: [string, any]) => {
+        reportAoa.push([
+          prov,
+          item.deposits || 0,
+          item.withdrawals || 0,
+          item.total || 0,
+          item.count || 0
+        ]);
+      });
+    }
+
+    // Section 3: Crédit de communication
+    if (parsed?.breakdown?.creditByProvider && Object.keys(parsed.breakdown.creditByProvider).length > 0) {
+      reportAoa.push(['']);
+      reportAoa.push(['3. VENTILATION CRÉDIT DE COMMUNICATION']);
+      reportAoa.push(['Opérateur', 'Montant Total Rechargé (XOF)', 'Nb Opérations']);
+      Object.entries(parsed.breakdown.creditByProvider).forEach(([prov, item]: [string, any]) => {
+        reportAoa.push([
+          prov,
+          item.total || 0,
+          item.count || 0
+        ]);
+      });
+    }
+
+    // Section 4: Billetterie
+    if (parsed?.breakdown?.ticketsByAirline && Object.keys(parsed.breakdown.ticketsByAirline).length > 0) {
+      reportAoa.push(['']);
+      reportAoa.push(['4. VENTILATION BILLETTERIE PAR COMPAGNIE']);
+      reportAoa.push(['Compagnie', 'Ventes Totales (XOF)', 'Commission Nette (XOF)', 'Nb Billets']);
+      Object.entries(parsed.breakdown.ticketsByAirline).forEach(([airline, item]: [string, any]) => {
+        reportAoa.push([
+          airline,
+          item.total || 0,
+          item.commission || 0,
+          item.count || 0
+        ]);
+      });
+    }
+
+    // Section 5: Transactions de change détaillées
+    if (parsed?.transactions && parsed.transactions.length > 0) {
+      reportAoa.push(['']);
+      reportAoa.push(['5. JOURNAL DES TRANSACTIONS DE CHANGE DU JOUR']);
+      reportAoa.push(['Heure / Date', 'Type', 'Paire de Devises', 'Montant Apporté', 'Taux Appliqué', 'Montant Donné']);
+      parsed.transactions.forEach((t: any) => {
+        reportAoa.push([
+          new Date(t.createdAt).toLocaleString('fr-FR'),
+          t.type === 'BUY' ? 'Achat de devise' : t.type === 'SELL' ? 'Vente de devise' : 'Échange',
+          `${t.fromCurrencyCode} → ${t.toCurrencyCode}`,
+          t.amountIn,
+          t.exchangeRate,
+          t.amountOut
+        ]);
+      });
+    }
+
+    const wsGlobal = utils.aoa_to_sheet(reportAoa);
+    // Définir des largeurs de colonnes confortables
+    wsGlobal['!cols'] = [
+      { wch: 38 },
+      { wch: 26 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 22 },
+    ];
+    utils.book_append_sheet(wb, wsGlobal, "Rapport Financier");
+
+    // Onglets détaillés supplémentaires
     if (parsed?.breakdown?.mobileMoneyByProvider) {
-      const mmData = [['Opérateur', 'Dépôts (XOF)', 'Retraits (XOF)', 'Total (XOF)', 'Nombre Op.']];
+      const mmData = [['Opérateur', 'Dépôts (XOF)', 'Retraits (XOF)', 'Total Net (XOF)', 'Nombre Opérations']];
       Object.entries(parsed.breakdown.mobileMoneyByProvider).forEach(([prov, item]: [string, any]) => {
         mmData.push([prov, item.deposits || 0, item.withdrawals || 0, item.total || 0, item.count || 0]);
       });
       const wsMM = utils.aoa_to_sheet(mmData);
-      utils.book_append_sheet(wb, wsMM, "Mobile Money");
+      wsMM['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 18 }];
+      utils.book_append_sheet(wb, wsMM, "Détail Mobile Money");
     }
 
-    // Feuille 3: Crédit par Opérateur
     if (parsed?.breakdown?.creditByProvider) {
-      const creditData = [['Opérateur', 'Montant Total (XOF)', 'Nombre Op.']];
+      const creditData = [['Opérateur', 'Montant Total (XOF)', 'Nombre Opérations']];
       Object.entries(parsed.breakdown.creditByProvider).forEach(([prov, item]: [string, any]) => {
         creditData.push([prov, item.total || 0, item.count || 0]);
       });
       const wsCredit = utils.aoa_to_sheet(creditData);
-      utils.book_append_sheet(wb, wsCredit, "Crédit");
+      wsCredit['!cols'] = [{ wch: 24 }, { wch: 24 }, { wch: 18 }];
+      utils.book_append_sheet(wb, wsCredit, "Détail Crédit");
     }
 
-    // Feuille 4: Billetterie par Compagnie
     if (parsed?.breakdown?.ticketsByAirline) {
       const ticketData = [['Compagnie', 'Ventes (XOF)', 'Commission (XOF)', 'Nombre Billets']];
       Object.entries(parsed.breakdown.ticketsByAirline).forEach(([airline, item]: [string, any]) => {
         ticketData.push([airline, item.total || 0, item.commission || 0, item.count || 0]);
       });
       const wsTicket = utils.aoa_to_sheet(ticketData);
-      utils.book_append_sheet(wb, wsTicket, "Billetterie");
+      wsTicket['!cols'] = [{ wch: 28 }, { wch: 20 }, { wch: 20 }, { wch: 18 }];
+      utils.book_append_sheet(wb, wsTicket, "Détail Billetterie");
     }
 
-    // Feuille 5: Transactions de Change détaillées
     if (parsed?.transactions && parsed.transactions.length > 0) {
-      const txnData = [['Date / Heure', 'Type', 'Paire', 'Montant Remis', 'Taux', 'Montant Reçu']];
+      const txnData = [['Date / Heure', 'Type', 'Paire', 'Montant Remis', 'Taux Appliqué', 'Montant Reçu']];
       parsed.transactions.forEach((t: any) => {
         txnData.push([
           new Date(t.createdAt).toLocaleString('fr-FR'),
@@ -155,10 +232,11 @@ export const ReportsPage = () => {
         ]);
       });
       const wsTxns = utils.aoa_to_sheet(txnData);
-      utils.book_append_sheet(wb, wsTxns, "Transactions Change");
+      wsTxns['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 18 }];
+      utils.book_append_sheet(wb, wsTxns, "Détail Transactions");
     }
 
-    writeFile(wb, `Rapport_${generator.replace(/\s+/g, '_')}_${new Date(r.date).toISOString().slice(0, 10)}.xlsx`);
+    writeFile(wb, `Rapport_Financier_${generator.replace(/\s+/g, '_')}_${new Date(r.date).toISOString().slice(0, 10)}.xlsx`);
   };
 
   const exportPDF = (r: DailyReport) => {

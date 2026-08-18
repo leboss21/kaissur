@@ -28,8 +28,30 @@ export const requireSuperAdmin = (req: Request, res: Response, next: NextFunctio
  */
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   const role = (req as any).userRole;
-  if (role !== 'ADMIN') {
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
     return res.status(403).json({ error: 'Accès refusé. Cette action nécessite le rôle Administrateur d\'entreprise.' });
+  }
+  return next();
+};
+
+/**
+ * Middleware to restrict route access to CHEF_CAISSE only (or ADMIN).
+ */
+export const requireChefCaisseOrAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const role = (req as any).userRole;
+  if (role !== 'CHEF_CAISSE' && role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Accès refusé. Cette action nécessite le rôle Chef Caisse.' });
+  }
+  return next();
+};
+
+/**
+ * Middleware to restrict route access to CHEF_CAISSE only.
+ */
+export const requireChefCaisse = (req: Request, res: Response, next: NextFunction) => {
+  const role = (req as any).userRole;
+  if (role !== 'CHEF_CAISSE' && role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Accès refusé. Cette action nécessite le rôle Chef Caisse.' });
   }
   return next();
 };

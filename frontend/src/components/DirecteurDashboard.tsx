@@ -531,13 +531,7 @@ export const DirecteurDashboard = () => {
     <div className="p-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h2 className="text-3xl font-bold text-white">Vue Direction</h2>
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full">
-              <Lock className="w-3 h-3 text-amber-400" />
-              <span className="text-amber-400 text-xs font-semibold">Lecture seule</span>
-            </div>
-          </div>
+          <h2 className="text-3xl font-bold text-white mb-1">Vue Direction</h2>
           <p className="text-textMuted">Supervision et analyse des performances</p>
         </div>
         <div className="flex gap-2 bg-white/5 border border-white/10 rounded-xl p-1">

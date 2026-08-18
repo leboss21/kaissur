@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { Lock, Mail, ArrowRightLeft } from 'lucide-react';
+import { Lock, Mail, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage = () => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -71,14 +72,23 @@ export const LoginPage = () => {
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-textMuted" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
-                className="glass-input w-full pl-11 py-3 text-white placeholder-white/30 text-sm focus:border-primary/50 focus:ring-1 focus:ring-primary/30 transition-all"
+                className="glass-input w-full pl-11 pr-11 py-3 text-white placeholder-white/30 text-sm focus:border-primary/50 focus:ring-1 focus:ring-primary/30 transition-all font-sans"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-textMuted hover:text-white transition-colors p-1"
+                title={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 
