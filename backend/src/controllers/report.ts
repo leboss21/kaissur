@@ -11,7 +11,7 @@ export const getReports = async (req: Request, res: Response) => {
 
     // Un caissier ne voit que les rapports générés depuis ses propres sessions
     const whereClause: any = { entrepriseId };
-    if (userRole === 'CASHIER') {
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
       whereClause.generatedByUserId = userId;
     }
 
@@ -62,7 +62,7 @@ export const generateDailyReport = async (req: Request, res: Response) => {
     if (!entrepriseId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Restriction : Seuls les rôles Caissier et Chef Caisse peuvent générer un rapport de caisse
-    if (userRole !== 'CASHIER' && userRole !== 'CHEF_CAISSE') {
+    if (userRole !== 'CASHIER' && userRole !== 'CAISSIER' && userRole !== 'CHEF_CAISSE') {
       return res.status(403).json({
         error: "Seul un utilisateur avec le rôle Caissier ou Chef Caisse peut générer un rapport journalier de caisse."
       });
@@ -73,13 +73,15 @@ export const generateDailyReport = async (req: Request, res: Response) => {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Pour un caissier : uniquement ses sessions clôturées du jour
+    // Pour un caissier : uniquement ses sessions clôturées du jour ; pour un chef caisse : toutes les sessions clôturées du jour
     const sessionWhere: any = {
       entrepriseId,
-      userId,
       status: 'CLOSED',
       date: { gte: startOfDay, lte: endOfDay }
     };
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
+      sessionWhere.userId = userId;
+    }
 
     const closedSessions = await prisma.cashRegisterSession.findMany({
       where: sessionWhere,
@@ -237,7 +239,15 @@ export const generateDailyReport = async (req: Request, res: Response) => {
 export const getMonthlyReport = async (req: Request, res: Response) => {
   try {
     const entrepriseId = (req as any).entrepriseId;
+    const userRole = (req as any).userRole;
     if (!entrepriseId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Restriction : Seuls Chef Caisse, Directeur et Admin peuvent consulter/générer le rapport mensuel
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
+      return res.status(403).json({
+        error: "Seul le Chef Caisse, la Direction ou l'Administrateur peut générer ou consulter le rapport mensuel."
+      });
+    }
 
     const { year, month } = req.query;
     const y = parseInt(year as string) || new Date().getFullYear();
@@ -313,7 +323,7 @@ export const getConsolidatedReport = async (req: Request, res: Response) => {
 
     if (!entrepriseId) return res.status(401).json({ error: 'Unauthorized' });
 
-    if (userRole === 'CASHIER') {
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
       return res.status(403).json({ error: 'Accès refusé. Vue réservée aux directeurs et administrateurs.' });
     }
 

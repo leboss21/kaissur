@@ -6,6 +6,7 @@ import {
   TrendingUp, Key, CheckCircle2, AlertCircle, RefreshCw,
   Power, Edit3, X, Eye, EyeOff, Sparkles, Phone, Mail, MapPin, FileText
 } from 'lucide-react';
+import { PhoneInput } from './ui/PhoneInput';
 
 function fmt(n: number | undefined | null) {
   if (n === undefined || n === null || isNaN(n as number)) return '0';
@@ -522,12 +523,10 @@ export const SuperAdminDashboard = () => {
                   </div>
                   <div>
                     <label className="block text-xs text-textMuted mb-1 font-medium">Téléphone</label>
-                    <input
-                      type="text"
-                      placeholder="+228 90 00 00 00"
-                      className="glass-input w-full text-sm"
+                    <PhoneInput
                       value={createForm.phone}
-                      onChange={e => setCreateForm({ ...createForm, phone: e.target.value })}
+                      onChange={val => setCreateForm({ ...createForm, phone: val || '' })}
+                      placeholder="+228 90 00 00 00"
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -662,11 +661,10 @@ export const SuperAdminDashboard = () => {
                 </div>
                 <div>
                   <label className="block text-xs text-textMuted mb-1">Téléphone</label>
-                  <input
-                    type="text"
-                    className="glass-input w-full text-sm"
+                  <PhoneInput
                     value={editForm.phone}
-                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                    onChange={val => setEditForm({ ...editForm, phone: val || '' })}
+                    placeholder="+228 90 00 00 00"
                   />
                 </div>
               </div>

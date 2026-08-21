@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldAlert, UserPlus, X, Pencil, KeyRound, Trash2, Briefcase, Vault } from 'lucide-react';
+import { Shield, ShieldAlert, UserPlus, X, Pencil, KeyRound, Trash2, Briefcase, Vault, Sparkles, Eye, EyeOff, Check, Copy } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/AuthContext';
 
 type ModalMode = 'create' | 'edit' | null;
 
@@ -8,6 +9,7 @@ const EMPTY_CREATE = { name: '', email: '', role: 'CASHIER', password: '' };
 const EMPTY_EDIT   = { name: '', email: '', role: 'CASHIER', password: '' };
 
 export const UsersPage = () => {
+  const { user } = useAuth();
   const [users, setUsers]           = useState<any[]>([]);
   const [loading, setLoading]       = useState(true);
   const [modalMode, setModalMode]   = useState<ModalMode>(null);
@@ -15,6 +17,9 @@ export const UsersPage = () => {
   const [form, setForm]             = useState(EMPTY_CREATE);
   const [error, setError]           = useState('');
   const [success, setSuccess]       = useState('');
+  const [companyName, setCompanyName] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedPass, setCopiedPass] = useState(false);
 
   const fetchUsers = () => {
     api.getUsers().then(res => {
@@ -23,11 +28,61 @@ export const UsersPage = () => {
     }).catch(console.error);
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    api.getEntreprise().then(ent => {
+      if (ent?.name) setCompanyName(ent.name);
+    }).catch(() => {});
+  }, []);
+
+  // Génération dynamique de l'email basé sur {prénom}@{entreprise}.com
+  const handleNameChange = (nameVal: string) => {
+    const prevSuggested = getSuggestedEmail(form.name);
+    const isEmailUntouchedOrSuggested = !form.email || form.email === prevSuggested;
+    
+    const newSuggested = getSuggestedEmail(nameVal);
+    setForm(prev => ({
+      ...prev,
+      name: nameVal,
+      email: isEmailUntouchedOrSuggested && nameVal.trim() ? newSuggested : prev.email
+    }));
+  };
+
+  const getSuggestedEmail = (fullName: string) => {
+    if (!fullName.trim()) return '';
+    const parts = fullName.trim().split(' ').filter(Boolean);
+    const firstName = parts[0] ? parts[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '') : '';
+    const compSlug = (companyName || user?.entrepriseName || 'entreprise')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+    return firstName ? `${firstName}@${compSlug || 'entreprise'}.com` : '';
+  };
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+    let generated = '';
+    for (let i = 0; i < 10; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setForm(prev => ({ ...prev, password: generated }));
+    setShowPassword(true);
+  };
+
+  const copyPasswordToClipboard = () => {
+    if (!form.password) return;
+    navigator.clipboard.writeText(form.password);
+    setCopiedPass(true);
+    setTimeout(() => setCopiedPass(false), 2000);
+  };
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm(EMPTY_CREATE);
+    setForm({ name: '', email: '', role: 'CASHIER', password: '' });
+    setShowPassword(false);
+    setCopiedPass(false);
     setError('');
     setSuccess('');
     setModalMode('create');
@@ -196,16 +251,77 @@ export const UsersPage = () => {
                 {error && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">{error}</div>}
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div>
-                    <label className="block text-textMuted text-sm mb-1.5">Nom complet</label>
-                    <input type="text" required placeholder="Ex: Jean Dupont" className="glass-input w-full" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                    <label className="block text-textMuted text-sm mb-1.5">Nom complet *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Jean Dupont"
+                      className="glass-input w-full"
+                      value={form.name}
+                      onChange={e => handleNameChange(e.target.value)}
+                    />
                   </div>
                   <div>
-                    <label className="block text-textMuted text-sm mb-1.5">Adresse Email</label>
-                    <input type="email" required placeholder="jean@example.com" className="glass-input w-full" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                    <label className="block text-textMuted text-sm mb-1.5">Adresse Email *</label>
+                    <input
+                      type="email"
+                      required
+                      className="glass-input w-full"
+                      value={form.email}
+                      onChange={e => setForm({...form, email: e.target.value})}
+                      placeholder={getSuggestedEmail('jean dupont') || 'jean@agence.com'}
+                    />
+                    {form.name && (
+                      <p className="text-xs text-primary/70 mt-1">
+                        💡 Suggestion : <span className="font-mono">{getSuggestedEmail(form.name)}</span>
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-textMuted text-sm mb-1.5">Mot de passe provisoire</label>
-                    <input type="password" required className="glass-input w-full" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-textMuted text-sm">Mot de passe provisoire *</label>
+                      <button
+                        type="button"
+                        onClick={generateRandomPassword}
+                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors font-medium cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Générer automatiquement
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        autoComplete="new-password"
+                        className="glass-input w-full pr-20 font-mono"
+                        value={form.password}
+                        onChange={e => setForm({...form, password: e.target.value})}
+                        placeholder="Saisir ou générer…"
+                      />
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                        {form.password && (
+                          <button
+                            type="button"
+                            onClick={copyPasswordToClipboard}
+                            title={copiedPass ? "Copié !" : "Copier le mot de passe"}
+                            className="text-textMuted hover:text-emerald-400 transition-colors p-1"
+                          >
+                            {copiedPass ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="text-textMuted hover:text-white transition-colors p-1"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    {form.password && (
+                      <p className="text-xs text-amber-400 mt-1">⚠️ Notez ou copiez ce mot de passe avant de créer le compte — il ne sera plus visible ensuite.</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-textMuted text-sm mb-1.5">Rôle initial</label>

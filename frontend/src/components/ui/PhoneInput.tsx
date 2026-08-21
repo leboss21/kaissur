@@ -17,7 +17,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({ value, onChange, classNa
         defaultCountry="TG" // Togo by default, easily changeable
         value={value}
         onChange={(val: any) => onChange(val || '')}
-        className="glass-input w-full flex"
+        className="glass-input w-full text-sm flex items-center"
         placeholder={placeholder || 'Numéro de téléphone'}
       />
     </div>

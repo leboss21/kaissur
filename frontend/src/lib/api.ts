@@ -105,8 +105,10 @@ export const api = {
 
   // Caisse Principale
   getMainCash: () => request<any>('/entreprise/main-cash'),
+  getLiveBalances: () => request<any>('/entreprise/main-cash/balances'),
   depositMainCash: (amount: number) => request<any>('/entreprise/main-cash/deposit', { method: 'POST', body: JSON.stringify({ amount }) }),
-  supplyCashierService: (data: { amount: number; targetService: string }) => request<any>('/entreprise/main-cash/supply', { method: 'POST', body: JSON.stringify(data) }),
+  supplyCashierService: (data: { amount: number; targetService: string; motif?: string; foreignAmount?: number; foreignCurrency?: string; exchangerName?: string }) => request<any>('/entreprise/main-cash/supply', { method: 'POST', body: JSON.stringify(data) }),
+  withdrawMainCash: (data: { amount: number; motif: string }) => request<any>('/entreprise/main-cash/withdraw', { method: 'POST', body: JSON.stringify(data) }),
 
   // SuperAdmin
   getPlatformStats: () => request<PlatformStats>('/superadmin/stats'),
@@ -294,6 +296,7 @@ export interface SessionBalance {
   id: string;
   sessionId: string;
   accountId: string;
+  displayName?: string;
   startingBalance: number;
   expectedEndingBalance: number;
   declaredEndingBalance?: number;

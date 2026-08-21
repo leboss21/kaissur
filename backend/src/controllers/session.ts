@@ -44,6 +44,12 @@ async function calculateExpectedEndingBalances(session: any) {
   currencyCodes.add('EUR');
   currencyCodes.add('GBP');
 
+  // Get providers for ID to name mapping
+  const providers = await prisma.serviceProvider.findMany({
+    where: { entrepriseId: session.entrepriseId }
+  });
+  const providerIdToNameMap = new Map(providers.map((p: any) => [p.id, p.name]));
+
   // Transactions liées à cette session (via sessionId en priorité, sinon horodatage)
   const txns = await prisma.transaction.findMany({
     where: {
@@ -84,6 +90,8 @@ async function calculateExpectedEndingBalances(session: any) {
     const normAccountId = normalizeProvider(accountId);
     let expectedEndingBalance = bal.startingBalance;
 
+    const isCurrency = currencyCodes.has(accountId.toUpperCase());
+    
     // 1. Add supplies from Main Cash
     const matchingSupplies = supplies.filter((s: any) => {
       const normTarget = normalizeProvider(s.targetService);
@@ -91,11 +99,15 @@ async function calculateExpectedEndingBalances(session: any) {
              normTarget === normalizeProvider(accountId.replace(/^(MM_|CR_)/, '')) ||
              normAccountId === normalizeProvider(s.targetService.replace(/^(MM_|CR_)/, ''));
     });
-    const totalSupplies = matchingSupplies.reduce((sum: number, s: any) => sum + s.amount, 0);
+    
+    const totalSupplies = matchingSupplies.reduce((sum: number, s: any) => {
+      // If supplying a foreign currency, use foreignAmount. Otherwise, use amount.
+      const val = (isCurrency && accountId.toUpperCase() !== 'XOF' && s.foreignAmount) ? s.foreignAmount : s.amount;
+      return sum + val;
+    }, 0);
     expectedEndingBalance += totalSupplies;
 
     // 2. Currency Exchanges (XOF, USD, EUR, etc.)
-    const isCurrency = currencyCodes.has(accountId.toUpperCase());
     if (isCurrency) {
       const inTxns = txns.filter((t: any) => t.fromCurrencyCode.toUpperCase() === accountId.toUpperCase());
       const outTxns = txns.filter((t: any) => t.toCurrencyCode.toUpperCase() === accountId.toUpperCase());
@@ -123,7 +135,8 @@ async function calculateExpectedEndingBalances(session: any) {
     // 4. Mobile Money Balances (MM_TMONEY, MM_FLOOZ, etc.)
     if (accountId.startsWith('MM_') || (!isCurrency && !accountId.startsWith('CR_'))) {
       const rawProvider = accountId.startsWith('MM_') ? accountId.substring(3) : accountId;
-      const provNorm = normalizeProvider(rawProvider);
+      const provName = providerIdToNameMap.get(rawProvider) || rawProvider;
+      const provNorm = normalizeProvider(provName);
 
       const mmOps = ops.filter((op: any) => op.type === 'MOBILE_MONEY' && normalizeProvider(op.provider) === provNorm);
       for (const op of mmOps) {
@@ -138,7 +151,8 @@ async function calculateExpectedEndingBalances(session: any) {
     // 5. Credit Balances (CR_MOOV, CR_YAS, etc.)
     if (accountId.startsWith('CR_')) {
       const rawProvider = accountId.substring(3);
-      const provNorm = normalizeProvider(rawProvider);
+      const provName = providerIdToNameMap.get(rawProvider) || rawProvider;
+      const provNorm = normalizeProvider(provName);
 
       const crOps = ops.filter((op: any) => op.type === 'CREDIT' && normalizeProvider(op.provider) === provNorm);
       for (const op of crOps) {
@@ -146,9 +160,19 @@ async function calculateExpectedEndingBalances(session: any) {
       }
     }
 
+    let displayName = accountId;
+    if (accountId.startsWith('MM_') || accountId.startsWith('CR_')) {
+      const rawProvider = accountId.substring(3);
+      const name = providerIdToNameMap.get(rawProvider);
+      if (name) {
+        displayName = accountId.startsWith('MM_') ? `Mobile Money - ${name}` : `Crédit - ${name}`;
+      }
+    }
+
     return {
       ...bal,
-      expectedEndingBalance
+      expectedEndingBalance,
+      displayName
     };
   });
 
@@ -179,7 +203,7 @@ export const getSession = async (req: Request, res: Response) => {
     };
 
     // Un caissier ne voit que SA session
-    if (userRole === 'CASHIER') {
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
       whereClause.userId = userId;
     } else if (userRole === 'DIRECTEUR') {
       // Directeur : pas de session propre, retourne null
@@ -217,7 +241,7 @@ export const getAllSessions = async (req: Request, res: Response) => {
     if (!entrepriseId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Caissier ne peut pas accéder à la vue globale
-    if (userRole === 'CASHIER') {
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
       return res.status(403).json({ error: 'Accès refusé. Vue réservée aux directeurs et administrateurs.' });
     }
 
@@ -288,9 +312,12 @@ export const openSession = async (req: Request, res: Response) => {
       include: { balances: true }
     });
 
-    const getStartingBalance = (accountId: string) => {
+    const getStartingBalance = (accountId: string, fallbackAccountId?: string) => {
       if (!lastSession) return 0;
-      const bal = lastSession.balances.find((b: any) => b.accountId === accountId);
+      let bal = lastSession.balances.find((b: any) => b.accountId === accountId);
+      if (!bal && fallbackAccountId) {
+        bal = lastSession.balances.find((b: any) => b.accountId === fallbackAccountId);
+      }
       return bal?.declaredEndingBalance ?? bal?.expectedEndingBalance ?? 0;
     };
 
@@ -305,11 +332,16 @@ export const openSession = async (req: Request, res: Response) => {
     }
 
     for (const prov of providers) {
-      const accountId = prov.type === 'MOBILE_MONEY' ? `MM_${prov.name}` : `CR_${prov.name}`;
+      // Use provider ID so it matches targetService in MainCashSupply (MM_{id} / CR_{id})
+      const accountId = prov.type === 'MOBILE_MONEY' ? `MM_${prov.id}` : `CR_${prov.id}`;
+      // Fallback to name-based accountId for migrating from old sessions
+      const fallbackAccountId = prov.type === 'MOBILE_MONEY' ? `MM_${prov.name}` : `CR_${prov.name}`;
+      
+      const startingBalance = getStartingBalance(accountId, fallbackAccountId);
       balancesData.push({
         accountId,
-        startingBalance: getStartingBalance(accountId),
-        expectedEndingBalance: getStartingBalance(accountId)
+        startingBalance,
+        expectedEndingBalance: startingBalance
       });
     }
 

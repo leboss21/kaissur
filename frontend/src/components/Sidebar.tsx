@@ -12,15 +12,15 @@ const navItems = [
   { name: 'Gestion Entreprises', icon: Building2, path: '/', roles: ['SUPER_ADMIN'] },
 
   // Tenant views
-  { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'DIRECTEUR'] },
+  { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER', 'DIRECTEUR'] },
   { name: 'Caisse Principale', icon: Vault, path: '/main-cash', roles: ['CHEF_CAISSE'] },
-  { name: 'Transactions', icon: ArrowRightLeft, path: '/transactions', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
-  { name: 'Mobile Money', icon: Smartphone, path: '/services/mobile-money', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
-  { name: 'Crédit Comm.', icon: Phone, path: '/services/credit', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
-  { name: 'Billetterie', icon: Plane, path: '/services/tickets', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'], group: 'Services' },
-  { name: 'Reçus', icon: ReceiptText, path: '/receipts', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'] },
-  { name: 'Clients', icon: Users, path: '/clients', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER'] },
-  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'DIRECTEUR', 'CHEF_CAISSE', 'CASHIER'] },
+  { name: 'Transactions', icon: ArrowRightLeft, path: '/transactions', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'], group: 'Services' },
+  { name: 'Mobile Money', icon: Smartphone, path: '/services/mobile-money', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'], group: 'Services' },
+  { name: 'Crédit Comm.', icon: Phone, path: '/services/credit', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'], group: 'Services' },
+  { name: 'Billetterie', icon: Plane, path: '/services/tickets', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'], group: 'Services' },
+  { name: 'Reçus', icon: ReceiptText, path: '/receipts', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'] },
+  { name: 'Clients', icon: Users, path: '/clients', roles: ['ADMIN', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'] },
+  { name: 'Rapports', icon: FileText, path: '/reports', roles: ['ADMIN', 'DIRECTEUR', 'CHEF_CAISSE', 'CASHIER', 'CAISSIER'] },
   { name: 'Équipe', icon: UserCog, path: '/users', roles: ['ADMIN'] },
   { name: 'Paramètres', icon: Settings, path: '/settings', roles: ['ADMIN', 'DIRECTEUR'] },
 ];

@@ -11,9 +11,12 @@ const PAGE_SIZE = 5;
 
 export const ReportsPage = () => {
   const { user } = useAuth();
-  const isCashier = user?.role === 'CASHIER';
+  const isCashier = user?.role === 'CASHIER' || user?.role === 'CAISSIER';
+  const isChefCaisse = user?.role === 'CHEF_CAISSE';
   const isDirecteur = user?.role === 'DIRECTEUR';
   const isAdmin = user?.role === 'ADMIN';
+  const canGenerateDaily = isCashier || isChefCaisse;
+  const canGenerateMonthly = isChefCaisse;
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +26,14 @@ export const ReportsPage = () => {
 
   // Quick View Modal
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
+
+  // Monthly report
+  const [showMonthly, setShowMonthly] = useState(false);
+  const [monthlyData, setMonthlyData] = useState<any>(null);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const now = new Date();
+  const [monthlyYear, setMonthlyYear] = useState(now.getFullYear());
+  const [monthlyMonth, setMonthlyMonth] = useState(now.getMonth() + 1);
 
   const fetchReports = async () => {
     try {
@@ -44,8 +55,8 @@ export const ReportsPage = () => {
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleGenerate = async () => {
-    if (!isCashier) {
-      setErrorMsg('Seul un caissier peut générer un rapport journalier de caisse.');
+    if (!canGenerateDaily) {
+      setErrorMsg('Seul un caissier ou chef caisse peut générer un rapport journalier.');
       return;
     }
     setGenerating(true);
@@ -59,6 +70,20 @@ export const ReportsPage = () => {
       setErrorMsg(e.message || 'Impossible de générer le rapport.');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleFetchMonthly = async () => {
+    setMonthlyLoading(true);
+    setErrorMsg('');
+    try {
+      const data = await api.getMonthlyReport(monthlyYear, monthlyMonth);
+      setMonthlyData(data);
+      setShowMonthly(true);
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Impossible de charger le rapport mensuel.');
+    } finally {
+      setMonthlyLoading(false);
     }
   };
 
@@ -372,6 +397,102 @@ export const ReportsPage = () => {
     doc.save(`Rapport_${new Date(r.date).toISOString().slice(0, 10)}.pdf`);
   };
 
+  const exportMonthlyPDF = (data: any) => {
+    if (!data) return;
+    const doc = new jsPDF();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(`RAPPORT FINANCIER MENSUEL — ${data.period?.month}/${data.period?.year}`, 14, 20);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`, 14, 28);
+
+    const sum = data.summary || {};
+    const summaryRows = [
+      ['Opérations de Change (Entrées)', `${fmtNum(sum.totalExchangeIn || 0)} XOF`],
+      ['Opérations de Change (Sorties)', `${fmtNum(sum.totalExchangeOut || 0)} XOF`],
+      ['Total Mobile Money (Dépôts + Retraits)', `${fmtNum(sum.totalMobileMoney || 0)} XOF`],
+      ['Total Crédits de communication', `${fmtNum(sum.totalCredit || 0)} XOF`],
+      ['Total Billetterie Aérienne', `${fmtNum(sum.totalTickets || 0)} XOF`],
+      ['Total Frais perçus', `${fmtNum(sum.totalFees || 0)} XOF`],
+      ['Total Commissions Billetterie', `${fmtNum(sum.totalCommission || 0)} XOF`],
+    ];
+
+    autoTable(doc, {
+      startY: 34,
+      head: [['Indicateur Clé', 'Montant Global']],
+      body: summaryRows,
+      headStyles: { fillColor: [147, 51, 234] }
+    });
+
+    let currentY = (doc as any).lastAutoTable.finalY + 12;
+
+    if (data.byDay && Object.keys(data.byDay).length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Ventilation Quotidienne du Mois', 14, currentY);
+
+      const dayRows = Object.entries(data.byDay).sort().map(([day, val]: [string, any]) => [
+        new Date(day).toLocaleDateString('fr-FR'),
+        `${fmtNum(val.exchanges || 0)} XOF`,
+        `${fmtNum(val.mobileMoney || 0)} XOF`,
+        `${fmtNum(val.credit || 0)} XOF`,
+        `${fmtNum(val.tickets || 0)} XOF`,
+        `${fmtNum(val.fees || 0)} XOF`
+      ]);
+
+      autoTable(doc, {
+        startY: currentY + 4,
+        head: [['Date', 'Change', 'Mobile Money', 'Crédits', 'Billetterie', 'Frais']],
+        body: dayRows,
+        headStyles: { fillColor: [59, 130, 246] }
+      });
+    }
+
+    doc.save(`Rapport_Mensuel_${data.period?.year}_${data.period?.month}.pdf`);
+  };
+
+  const exportMonthlyExcel = (data: any) => {
+    if (!data) return;
+    const wb = utils.book_new();
+    const sum = data.summary || {};
+
+    const summaryAoa = [
+      [`RAPPORT MENSUEL — ${data.period?.month}/${data.period?.year}`],
+      [`Généré le : ${new Date().toLocaleString('fr-FR')}`],
+      [],
+      ['Indicateur', 'Montant (XOF)'],
+      ['Entrées Change', sum.totalExchangeIn || 0],
+      ['Sorties Change', sum.totalExchangeOut || 0],
+      ['Mobile Money', sum.totalMobileMoney || 0],
+      ['Crédits Communication', sum.totalCredit || 0],
+      ['Billetterie', sum.totalTickets || 0],
+      ['Frais Perçus', sum.totalFees || 0],
+      ['Commissions Billetterie', sum.totalCommission || 0],
+      [],
+      ['DÉTAIL JOURNALIER'],
+      ['Date', 'Change (XOF)', 'Mobile Money (XOF)', 'Crédits (XOF)', 'Billets (XOF)', 'Frais (XOF)']
+    ];
+
+    if (data.byDay) {
+      Object.entries(data.byDay).sort().forEach(([day, val]: [string, any]) => {
+        summaryAoa.push([
+          day,
+          val.exchanges || 0,
+          val.mobileMoney || 0,
+          val.credit || 0,
+          val.tickets || 0,
+          val.fees || 0
+        ]);
+      });
+    }
+
+    const ws = utils.aoa_to_sheet(summaryAoa);
+    utils.book_append_sheet(wb, ws, 'Rapport Mensuel');
+    writeFile(wb, `Rapport_Mensuel_${data.period?.year}_${data.period?.month}.xlsx`);
+  };
+
   // Filter & Paginate Reports
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
@@ -396,23 +517,55 @@ export const ReportsPage = () => {
   return (
     <div className="p-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white">Rapports Financiers Journaliers</h2>
           <p className="text-textMuted mt-1">
             {isDirecteur || isAdmin ? 'Consultation, analyse et exportation' : 'Génération, aperçu et exportation des rapports de caisse'}
           </p>
         </div>
-        {isCashier ? (
-          <button onClick={handleGenerate} disabled={generating} className="btn-primary flex items-center gap-2 py-3 px-5 text-base shadow-lg shadow-primary/20">
-            <FileText className="w-5 h-5" /> {generating ? 'Génération en cours...' : 'Générer le rapport du jour'}
-          </button>
-        ) : (
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-            <Lock className="w-4 h-4 text-blue-400" />
-            <span className="text-blue-400 text-sm font-medium">Mode Consultation</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {canGenerateMonthly && (
+            <div className="flex items-center gap-2 border border-white/10 bg-white/5 rounded-xl p-2">
+              <select
+                className="bg-transparent text-white text-sm focus:outline-none"
+                value={monthlyMonth}
+                onChange={e => setMonthlyMonth(Number(e.target.value))}
+              >
+                {['Janv.','Févr.','Mars','Avr.','Mai','Juin','Juil.','Août','Sept.','Oct.','Nov.','Déc.'].map((m, i) => (
+                  <option key={i+1} value={i+1} className="bg-slate-900">{m}</option>
+                ))}
+              </select>
+              <select
+                className="bg-transparent text-white text-sm focus:outline-none"
+                value={monthlyYear}
+                onChange={e => setMonthlyYear(Number(e.target.value))}
+              >
+                {[2024, 2025, 2026].map(y => (
+                  <option key={y} value={y} className="bg-slate-900">{y}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleFetchMonthly}
+                disabled={monthlyLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 transition-colors"
+              >
+                <Calendar className="w-4 h-4" />
+                {monthlyLoading ? 'Chargement...' : 'Rapport Mensuel'}
+              </button>
+            </div>
+          )}
+          {canGenerateDaily ? (
+            <button onClick={handleGenerate} disabled={generating} className="btn-primary flex items-center gap-2 py-3 px-5 text-base shadow-lg shadow-primary/20">
+              <FileText className="w-5 h-5" /> {generating ? 'Génération en cours...' : 'Générer le rapport du jour'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+              <Lock className="w-4 h-4 text-blue-400" />
+              <span className="text-blue-400 text-sm font-medium">Mode Consultation</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {successMsg && (
@@ -635,6 +788,106 @@ export const ReportsPage = () => {
               </button>
               <button onClick={() => exportExcel(selectedReport)} className="btn-ghost flex items-center gap-2 border border-white/10">
                 <Download className="w-4 h-4" /> Export Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Report Modal */}
+      {showMonthly && monthlyData && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="glass-panel p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto space-y-6">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Calendar className="w-6 h-6 text-purple-400" />
+                  Rapport Financier Mensuel — {monthlyData.period?.month}/{monthlyData.period?.year}
+                </h3>
+                <p className="text-sm text-textMuted mt-1">
+                  Synthèse globale consolidée de toutes les opérations du mois
+                </p>
+              </div>
+              <button onClick={() => setShowMonthly(false)} className="btn-ghost p-2 text-textMuted hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Monthly Summary KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Entrées Change</span>
+                <div className="text-lg font-bold text-emerald-400 mt-1">{fmtNum(monthlyData.summary?.totalExchangeIn || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Sorties Change</span>
+                <div className="text-lg font-bold text-rose-400 mt-1">{fmtNum(monthlyData.summary?.totalExchangeOut || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Total Mobile Money</span>
+                <div className="text-lg font-bold text-yellow-400 mt-1">{fmtNum(monthlyData.summary?.totalMobileMoney || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Ventes Crédits</span>
+                <div className="text-lg font-bold text-blue-400 mt-1">{fmtNum(monthlyData.summary?.totalCredit || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Ventes Billets</span>
+                <div className="text-lg font-bold text-purple-400 mt-1">{fmtNum(monthlyData.summary?.totalTickets || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Frais Perçus</span>
+                <div className="text-lg font-bold text-white mt-1">{fmtNum(monthlyData.summary?.totalFees || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Commissions Billets</span>
+                <div className="text-lg font-bold text-emerald-400 mt-1">{fmtNum(monthlyData.summary?.totalCommission || 0)} XOF</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <span className="text-xs text-textMuted">Nombre d'opérations</span>
+                <div className="text-lg font-bold text-white mt-1">{(monthlyData.summary?.totalTransactions || 0) + (monthlyData.summary?.totalServiceOps || 0)}</div>
+              </div>
+            </div>
+
+            {/* Daily breakdown table */}
+            {monthlyData.byDay && Object.keys(monthlyData.byDay).length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Détail par Jour</h4>
+                <div className="overflow-x-auto max-h-60 rounded-xl border border-white/10">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-white/5 text-textMuted uppercase border-b border-white/10 sticky top-0">
+                      <tr>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Change (XOF)</th>
+                        <th className="p-3">Mobile Money (XOF)</th>
+                        <th className="p-3">Crédits (XOF)</th>
+                        <th className="p-3">Billets (XOF)</th>
+                        <th className="p-3">Frais (XOF)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {Object.entries(monthlyData.byDay).sort().map(([day, val]: [string, any]) => (
+                        <tr key={day} className="hover:bg-white/5">
+                          <td className="p-3 font-medium text-white">{new Date(day).toLocaleDateString('fr-FR')}</td>
+                          <td className="p-3 text-textMuted font-mono">{fmtNum(val.exchanges || 0)}</td>
+                          <td className="p-3 text-textMuted font-mono">{fmtNum(val.mobileMoney || 0)}</td>
+                          <td className="p-3 text-textMuted font-mono">{fmtNum(val.credit || 0)}</td>
+                          <td className="p-3 text-textMuted font-mono">{fmtNum(val.tickets || 0)}</td>
+                          <td className="p-3 text-textMuted font-mono">{fmtNum(val.fees || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+              <button onClick={() => exportMonthlyPDF(monthlyData)} className="btn-primary flex items-center gap-2 bg-purple-600 hover:bg-purple-500">
+                <Download className="w-4 h-4" /> Télécharger PDF Mensuel
+              </button>
+              <button onClick={() => exportMonthlyExcel(monthlyData)} className="btn-ghost flex items-center gap-2 border border-white/10">
+                <Download className="w-4 h-4" /> Export Excel Mensuel
               </button>
             </div>
           </div>

@@ -273,15 +273,21 @@ model Receipt {
 }
 
 model MainCashSupply {
-  id             String      @id @default(uuid())
-  entrepriseId   String
-  entreprise     Entreprise  @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User        @relation(fields: [userId], references: [id])
+  id              String      @id @default(uuid())
+  entrepriseId    String
+  entreprise      Entreprise  @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
   
-  amount         Float       // Montant débité de la caisse principale
-  targetService  String      // "XOF", "USD", "MM_TMONEY", "CR_MOOV", etc.
+  amount          Float       // Montant débité ou crédité de la caisse principale (en XOF)
+  targetService   String      // "XOF", "USD", "MM_TMONEY", "CR_MOOV", "WITHDRAWAL", etc.
   
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  motif           String?     // Motif de la sortie ou commentaire
+  type            String?     @default("SUPPLY") // "DEPOSIT", "SUPPLY", "WITHDRAWAL"
+  foreignAmount   Float?      // Montant en devise reçu (si approvisionnement devise)
+  foreignCurrency String?     // Code devise (ex: "USD", "EUR")
+  exchangerName   String?     // Nom de l'échangeur / fournisseur de devises
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }

@@ -111,12 +111,12 @@ export const CashierDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {session.balances.map(b => {
+                      {session.balances.filter(b => b.accountId === 'XOF' || b.startingBalance !== 0 || b.expectedEndingBalance !== 0).map(b => {
                         const diff = b.expectedEndingBalance - b.startingBalance;
                         return (
                           <tr key={b.accountId} className="hover:bg-white/5 transition-colors">
                             <td className="py-3 pr-4 text-white font-medium font-mono">
-                              {b.accountId}
+                              {b.displayName || b.accountId}
                             </td>
                             <td className="py-3 pr-4 text-textMuted">
                               {fmt(b.startingBalance)}

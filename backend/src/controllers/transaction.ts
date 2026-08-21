@@ -22,7 +22,7 @@ export const getTransactions = async (req: Request, res: Response) => {
 
     // Un caissier ne voit que ses propres transactions
     const whereClause: any = { entrepriseId };
-    if (userRole === 'CASHIER') {
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
       whereClause.userId = userId;
     }
 
@@ -89,16 +89,33 @@ export const createTransaction = async (req: Request, res: Response) => {
 
     // 2. Update Cash Registers (best effort)
     try {
-      await prisma.cashRegister.upsert({
-        where: { entrepriseId_currencyId: { entrepriseId, currencyId: fromCurrencyCode.toUpperCase() } },
-        update: { balance: { increment: parseFloat(amountIn) } },
-        create: { entrepriseId, currencyId: fromCurrencyCode.toUpperCase(), balance: parseFloat(amountIn) }
+      const existingFrom = await prisma.cashRegister.findUnique({
+        where: { entrepriseId_currencyId: { entrepriseId, currencyId: fromCurrencyCode.toUpperCase() } }
       });
-      await prisma.cashRegister.upsert({
-        where: { entrepriseId_currencyId: { entrepriseId, currencyId: toCurrencyCode.toUpperCase() } },
-        update: { balance: { decrement: amountOut } },
-        create: { entrepriseId, currencyId: toCurrencyCode.toUpperCase(), balance: -amountOut }
+      if (existingFrom) {
+        await prisma.cashRegister.update({
+          where: { id: existingFrom.id },
+          data: { balance: { increment: parseFloat(amountIn) } }
+        });
+      } else {
+        await prisma.cashRegister.create({
+          data: { entrepriseId, currencyId: fromCurrencyCode.toUpperCase(), balance: parseFloat(amountIn) }
+        });
+      }
+
+      const existingTo = await prisma.cashRegister.findUnique({
+        where: { entrepriseId_currencyId: { entrepriseId, currencyId: toCurrencyCode.toUpperCase() } }
       });
+      if (existingTo) {
+        await prisma.cashRegister.update({
+          where: { id: existingTo.id },
+          data: { balance: { decrement: amountOut } }
+        });
+      } else {
+        await prisma.cashRegister.create({
+          data: { entrepriseId, currencyId: toCurrencyCode.toUpperCase(), balance: -amountOut }
+        });
+      }
     } catch (cashErr) {
       console.warn('Cash register update failed (non-critical):', cashErr);
     }
@@ -140,7 +157,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
     }
 
     // Un caissier ne peut modifier que ses propres transactions
-    if (userRole === 'CASHIER' && existing.userId !== userId) {
+    if ((userRole === 'CASHIER' || userRole === 'CAISSIER') && existing.userId !== userId) {
       return res.status(403).json({ error: 'Accès refusé. Vous ne pouvez modifier que vos propres transactions.' });
     }
 

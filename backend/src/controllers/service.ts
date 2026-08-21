@@ -21,7 +21,7 @@ export const getServiceOperations = async (req: Request, res: Response) => {
 
     // Un caissier ne voit que ses propres opérations
     const whereClause: any = { entrepriseId };
-    if (userRole === 'CASHIER') {
+    if (userRole === 'CASHIER' || userRole === 'CAISSIER') {
       whereClause.userId = userId;
     }
 
@@ -150,7 +150,7 @@ export const updateServiceOperation = async (req: Request, res: Response) => {
     }
 
     // Un caissier ne peut modifier que ses propres opérations
-    if (userRole === 'CASHIER' && existing.userId !== userId) {
+    if ((userRole === 'CASHIER' || userRole === 'CAISSIER') && existing.userId !== userId) {
       return res.status(403).json({ error: 'Accès refusé. Vous ne pouvez modifier que vos propres opérations.' });
     }
 

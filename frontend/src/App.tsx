@@ -25,7 +25,7 @@ function MainLayout() {
   const isAdmin = user.role === 'ADMIN';
   const isChefCaisse = user.role === 'CHEF_CAISSE';
   const isDirecteur = user.role === 'DIRECTEUR';
-  const isCashier = user.role === 'CASHIER';
+  const isCashier = user.role === 'CASHIER' || user.role === 'CAISSIER';
 
   // SuperAdmin has dedicated platform view
   if (isSuperAdmin) {

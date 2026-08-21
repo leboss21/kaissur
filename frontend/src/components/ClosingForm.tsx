@@ -193,7 +193,7 @@ export const ClosingForm = ({ session, onClosed, onCancel }: Props) => {
             {activeNonXOF.map(b => (
               <div key={b.accountId}>
                 <label className="block text-textMuted text-sm mb-1.5 font-medium">
-                  {b.accountId}
+                  {b.displayName || b.accountId}
                   <span className="ml-2 text-xs text-primary/70">attendu: {fmt(b.expectedEndingBalance)}</span>
                 </label>
                 <input
@@ -240,7 +240,7 @@ export const ClosingForm = ({ session, onClosed, onCancel }: Props) => {
             const diff = declared - b.expectedEndingBalance;
             return (
               <tr key={b.accountId} className="text-white">
-                <td className="py-2 font-mono text-sm">{b.accountId}</td>
+                <td className="py-2 font-mono text-sm">{b.displayName || b.accountId}</td>
                 <td className="py-2">{fmt(b.expectedEndingBalance)}</td>
                 <td className="py-2 font-semibold">{fmt(declared)}</td>
                 <td className="py-2">
